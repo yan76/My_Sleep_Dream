@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "早睡自救局",
+    "slug": "my-sleep-dream",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "mysleepdream",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "splash": {
+      "image": "./assets/ui/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#090A19"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090A19"
+      }
+    }
+  }
+}

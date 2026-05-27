@@ -1,0 +1,21 @@
+export const colors = {
+  background: "#090A19",
+  backgroundDeep: "#10102B",
+  surface: "rgba(255,255,255,0.055)",
+  surfaceStrong: "rgba(255,255,255,0.1)",
+  surfaceWarm: "rgba(224,210,178,0.16)",
+  surfaceCool: "rgba(133,147,255,0.14)",
+  ink: "#F6F6FF",
+  muted: "#AEB1C9",
+  line: "rgba(255,255,255,0.18)",
+  lineStrong: "rgba(255,255,255,0.32)",
+  primary: "#8796FF",
+  primaryDark: "#6F7EE8",
+  accent: "#E3D4B5",
+  warning: "#F0C978",
+  danger: "#FF7083",
+  success: "#99E3BB",
+  lavender: "#24223F",
+  buttonText: "#10101B",
+  tabBar: "#070817"
+};
