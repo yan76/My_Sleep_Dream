@@ -18,10 +18,8 @@ export function CountdownCard({ targetTime }: CountdownCardProps) {
       </View>
       <View style={styles.valueRow}>
         <Text style={styles.value}>{countdown.label}</Text>
-        <Text style={styles.unit}>小时</Text>
       </View>
       <Text style={styles.note}>不用立刻消失，只要先别再开新的一轮。</Text>
-      {/* Decorative subtle gradient bar */}
       <View style={styles.decorBar}>
         <View style={styles.decorFill} />
       </View>
@@ -64,11 +62,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 42,
     fontWeight: "800"
-  },
-  unit: {
-    color: colors.muted,
-    fontSize: 16,
-    fontWeight: "700"
   },
   note: {
     color: colors.muted,

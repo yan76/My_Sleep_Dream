@@ -1,173 +1,190 @@
-import { router } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
-import { AppTextInput } from "@/components/common/AppTextInput";
-import { BottomNav } from "@/components/common/BottomNav";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
-import { useAppStore } from "@/store/useAppStore";
-import { todayKey } from "@/utils/date";
+import {
+  getLatestSleepRecord,
+  getSessionByDate
+} from "@/storage/rescueSessionStorage";
+import { RescueSession, SleepRecord } from "@/types/app";
 
-const moods = [
-  { label: "紧绷", color: colors.danger },
-  { label: "焦虑", color: colors.warning },
-  { label: "平静", color: colors.primary },
-  { label: "释怀", color: colors.success }
-] as const;
+function getFeedback(record: SleepRecord | null) {
+  if (!record) {
+    return "还没有可复盘的睡眠记录。完成次日打卡后，这里会显示昨晚结果。";
+  }
+
+  if (record.success) {
+    return "昨晚你按时停下来了。不是因为完美，而是你真的给自己争取到了一段恢复时间。";
+  }
+
+  return "昨晚没有按时也没关系。今晚先把入口变小：提前打开自救流程，遇到想刷时直接进下线挑战。";
+}
 
 export default function ReviewScreen() {
-  const existing = useAppStore((state) => state.dailyRecords[todayKey()]?.review);
-  const saveReview = useAppStore((state) => state.saveReview);
-  const [events, setEvents] = useState(existing?.events ?? "");
-  const [gains, setGains] = useState(existing?.gains ?? "");
-  const [tomorrowWishlist, setTomorrowWishlist] = useState(existing?.tomorrowWishlist ?? "");
-  const [selectedMood, setSelectedMood] = useState(1);
+  const [record, setRecord] = useState<SleepRecord | null>(null);
+  const [session, setSession] = useState<RescueSession | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const save = () => {
-    saveReview({ events, gains, tomorrowWishlist });
-    router.push("/rescue");
-  };
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      async function loadReview() {
+        setLoading(true);
+        const latest = await getLatestSleepRecord();
+        const relatedSession = latest ? await getSessionByDate(latest.date) : null;
+
+        if (active) {
+          setRecord(latest);
+          setSession(relatedSession);
+          setLoading(false);
+        }
+      }
+
+      loadReview();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const feedback = getFeedback(record);
 
   return (
     <Screen>
-      <PageHeader title="今日清空仪式" subtitle="把白天的情绪留在这里，大脑才能安心下线" />
+      <PageHeader title="今日复盘" subtitle="看见结果，然后把今晚变得更容易一点。" />
 
-      {/* Mood selector */}
-      <AppCard style={styles.moodCard}>
-        <Text style={styles.cardTitle}>今天的心情</Text>
-        <View style={styles.moodRow}>
-          {moods.map((mood, index) => (
-            <Pressable
-              key={mood.label}
-              onPress={() => setSelectedMood(index)}
-              style={[
-                styles.moodChip,
-                selectedMood === index && { borderColor: mood.color, backgroundColor: mood.color + "20" }
-              ]}
-            >
-              <Text style={[
-                styles.moodText,
-                selectedMood === index && { color: mood.color }
-              ]}>{mood.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </AppCard>
+      {!record && !loading ? (
+        <AppCard topAccent>
+          <Text style={styles.emptyTitle}>还没有打卡记录</Text>
+          <Text style={styles.emptyText}>{feedback}</Text>
+          <AppButton title="去次日打卡" variant="secondary" onPress={() => router.push("/checkin")} />
+        </AppCard>
+      ) : (
+        <>
+          <AppCard topAccent>
+            <Text style={styles.resultLabel}>昨晚结果</Text>
+            <Text style={[styles.resultTitle, record?.success ? styles.successText : styles.failText]}>
+              {loading ? "读取中..." : record?.success ? "按时睡了" : "没有按时"}
+            </Text>
+            <Text style={styles.feedback}>{feedback}</Text>
+          </AppCard>
 
-      {/* Input sections */}
-      <AppCard>
-        <Text style={styles.cardTitle}>今天最放不下的事</Text>
-        <AppTextInput
-          value={events}
-          onChangeText={setEvents}
-          placeholder="写下今天最让你放不下的事..."
-          multiline
-          style={styles.largeInput}
-        />
-      </AppCard>
+          <AppCard tone="cool">
+            <Text style={styles.cardTitle}>记录详情</Text>
+            <View style={styles.grid}>
+              <View style={styles.item}>
+                <Text style={styles.itemValue}>{record?.actualSleepTime ?? "--:--"}</Text>
+                <Text style={styles.itemLabel}>实际睡觉时间</Text>
+              </View>
+              <View style={styles.item}>
+                <Text style={styles.itemValue}>{session?.shutdownChallengeCompleted ? "是" : "否"}</Text>
+                <Text style={styles.itemLabel}>完成下线挑战</Text>
+              </View>
+              <View style={styles.item}>
+                <Text style={styles.itemValue}>{session?.relaxModeUsed ? "是" : "否"}</Text>
+                <Text style={styles.itemLabel}>使用放松模式</Text>
+              </View>
+              <View style={styles.item}>
+                <Text style={styles.itemValue}>{record?.moodNextMorning ?? "未记录"}</Text>
+                <Text style={styles.itemLabel}>醒来的感觉</Text>
+              </View>
+            </View>
+          </AppCard>
 
-      <AppCard>
-        <Text style={styles.cardTitle}>今天的小收获</Text>
-        <AppTextInput
-          value={gains}
-          onChangeText={setGains}
-          placeholder="哪怕很小，也值得记一笔..."
-          multiline
-          style={styles.input}
-        />
-      </AppCard>
+          {!record?.success && record?.reasonIfFailed ? (
+            <AppCard>
+              <Text style={styles.cardTitle}>失败原因</Text>
+              <Text style={styles.reason}>{record.reasonIfFailed}</Text>
+              <Text style={styles.feedback}>补救建议：今晚把“开始自救”提前到目标睡觉时间前 30 分钟。</Text>
+            </AppCard>
+          ) : null}
 
-      <AppCard>
-        <Text style={styles.cardTitle}>明天再处理</Text>
-        <AppTextInput
-          value={tomorrowWishlist}
-          onChangeText={setTomorrowWishlist}
-          placeholder="移到明天，今天不加班..."
-          multiline
-          style={styles.input}
-        />
-      </AppCard>
+          <AppCard>
+            <Text style={styles.cardTitle}>今日一句反馈</Text>
+            <Text style={styles.feedback}>{feedback}</Text>
+          </AppCard>
+        </>
+      )}
 
-      {/* Quick action tags */}
-      <View style={styles.quickTags}>
-        {["工作压力", "社交消耗", "刷手机", "什么都没做"].map((tag) => (
-          <Pressable
-            key={tag}
-            onPress={() => setEvents((prev) => (prev ? `${prev}\n${tag}` : tag))}
-            style={styles.tag}
-          >
-            <Text style={styles.tagText}>+ {tag}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <AppButton title="封存今日，进入自救" variant="gradient" onPress={save} />
-      <BottomNav active="review" />
+      <AppButton title="回到首页" variant="gradient" onPress={() => router.push("/")} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  moodCard: {
-    minHeight: 120
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: "800"
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: 16,
+    lineHeight: 24
+  },
+  resultLabel: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  resultTitle: {
+    fontSize: 34,
+    fontWeight: "800"
+  },
+  successText: {
+    color: colors.success
+  },
+  failText: {
+    color: colors.warning
   },
   cardTitle: {
     color: colors.ink,
     fontSize: 20,
     fontWeight: "800"
   },
-  moodRow: {
-    flexDirection: "row",
-    gap: 10
-  },
-  moodChip: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  moodText: {
+  feedback: {
     color: colors.muted,
-    fontSize: 15,
-    fontWeight: "800"
+    fontSize: 16,
+    lineHeight: 24
   },
-  largeInput: {
-    minHeight: 120,
-    fontSize: 17,
-    lineHeight: 26,
-    padding: 18,
-    marginTop: 8
-  },
-  input: {
-    minHeight: 80,
-    fontSize: 17,
-    lineHeight: 24,
-    padding: 16,
-    marginTop: 8
-  },
-  quickTags: {
+  grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 10
   },
-  tag: {
+  item: {
+    width: "48%",
+    minHeight: 96,
     borderRadius: 20,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    gap: 6
   },
-  tagText: {
+  itemValue: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center" as const
+  },
+  itemLabel: {
     color: colors.muted,
-    fontSize: 14,
-    fontWeight: "700"
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center" as const
+  },
+  reason: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "800"
   }
 });

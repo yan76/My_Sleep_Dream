@@ -28,7 +28,7 @@ type AppStore = {
   dailyRecords: Record<string, DailyRecord>;
   badges: Record<BadgeId, Badge>;
   completeOnboarding: (input: Pick<UserConfig, "targetBedtime" | "wakeUpTime" | "lateNightReasons">) => void;
-  updateConfig: (input: Partial<Pick<UserConfig, "targetBedtime" | "wakeUpTime" | "lateNightReasons">>) => void;
+  updateConfig: (input: Partial<Pick<UserConfig, "targetBedtime" | "targetSleepTime" | "wakeUpTime" | "lateNightReasons">>) => void;
   updateReminderSettings: (input: Partial<ReminderSettings>) => void;
   ensureTodayRecord: () => DailyRecord;
   confirmContract: (plannedBedtime: string) => void;
@@ -43,8 +43,10 @@ const nowIso = () => new Date().toISOString();
 
 const defaultUserConfig: UserConfig = {
   hasOnboarded: false,
+  targetSleepTime: "23:30",
   targetBedtime: "23:30",
   wakeUpTime: "07:30",
+  reminderMinutesBefore: 30,
   lateNightReasons: [],
   createdAt: nowIso(),
   updatedAt: nowIso()
@@ -92,8 +94,10 @@ export const useAppStore = create<AppStore>()(
         set({
           userConfig: {
             hasOnboarded: true,
+            targetSleepTime: input.targetBedtime,
             targetBedtime: input.targetBedtime,
             wakeUpTime: input.wakeUpTime,
+            reminderMinutesBefore: defaultReminderSettings.bedtimeModeReminderMinutesBefore,
             lateNightReasons: input.lateNightReasons,
             createdAt: now,
             updatedAt: now
@@ -106,6 +110,8 @@ export const useAppStore = create<AppStore>()(
           userConfig: {
             ...state.userConfig,
             ...input,
+            targetSleepTime: input.targetSleepTime ?? input.targetBedtime ?? state.userConfig.targetSleepTime,
+            targetBedtime: input.targetBedtime ?? input.targetSleepTime ?? state.userConfig.targetBedtime,
             updatedAt: nowIso()
           }
         }));
@@ -113,6 +119,12 @@ export const useAppStore = create<AppStore>()(
 
       updateReminderSettings: (input) => {
         set((state) => ({
+          userConfig: {
+            ...state.userConfig,
+            reminderMinutesBefore:
+              input.bedtimeModeReminderMinutesBefore ?? state.userConfig.reminderMinutesBefore,
+            updatedAt: nowIso()
+          },
           reminderSettings: {
             ...state.reminderSettings,
             ...input

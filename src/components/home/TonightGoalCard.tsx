@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { AppCard } from "@/components/common/AppCard";
 import { colors } from "@/constants/colors";
+import { useCountdown } from "@/hooks/useCountdown";
 
 type TonightGoalCardProps = {
   bedtime: string;
@@ -8,18 +9,21 @@ type TonightGoalCardProps = {
 };
 
 export function TonightGoalCard({ bedtime, wakeUpTime }: TonightGoalCardProps) {
+  const countdown = useCountdown(bedtime);
+  const progress = Math.max(0, Math.min(100, 100 - (countdown.minutes / (24 * 60)) * 100));
+
   return (
     <AppCard style={styles.card} topAccent>
       <Text style={styles.label}>今晚目标：{bedtime} 前放下手机</Text>
       <View style={styles.row}>
-        <Text style={styles.time}>42:00</Text>
+        <Text style={styles.time}>{countdown.label}</Text>
         <View style={styles.progressTrack}>
-          <View style={styles.progressFill} />
+          <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
       </View>
       <View style={styles.bottomRow}>
         <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>就寝</Text>
+          <Text style={styles.metaLabel}>目标</Text>
           <Text style={styles.metaValue}>{bedtime}</Text>
         </View>
         <View style={styles.metaDivider} />
@@ -30,7 +34,7 @@ export function TonightGoalCard({ bedtime, wakeUpTime }: TonightGoalCardProps) {
         <View style={styles.metaDivider} />
         <View style={styles.metaItem}>
           <Text style={styles.metaLabel}>进度</Text>
-          <Text style={styles.metaValue}>62%</Text>
+          <Text style={styles.metaValue}>{Math.round(progress)}%</Text>
         </View>
       </View>
     </AppCard>
@@ -55,7 +59,7 @@ const styles = StyleSheet.create({
   },
   time: {
     color: colors.accent,
-    fontSize: 56,
+    fontSize: 32,
     fontWeight: "800"
   },
   progressTrack: {
@@ -66,7 +70,6 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   progressFill: {
-    width: "62%",
     height: "100%",
     borderRadius: 999,
     backgroundColor: colors.accent

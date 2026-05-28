@@ -8,7 +8,7 @@ type BottomNavProps = {
 
 const navItems = [
   { key: "home", label: "首页", href: "/" },
-  { key: "review", label: "复盘", href: "/review" },
+  { key: "review", label: "复盘", href: "/today-review" },
   { key: "rescue", label: "自救", href: "/rescue" },
   { key: "audio", label: "白噪音", href: "/bedtime" },
   { key: "growth", label: "成长", href: "/records" }

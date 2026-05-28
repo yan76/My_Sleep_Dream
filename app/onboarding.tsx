@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Screen } from "@/components/common/Screen";
 import { TimePickerField } from "@/components/common/TimePickerField";
 import { colors } from "@/constants/colors";
+import { saveUserConfig } from "@/storage/rescueSessionStorage";
 import { lateNightReasons } from "@/constants/reasons";
 import { useAppStore } from "@/store/useAppStore";
 import { LateNightReason } from "@/types/app";
@@ -26,8 +27,15 @@ export default function OnboardingScreen() {
     );
   };
 
-  const save = () => {
+  const save = async () => {
     completeOnboarding({ targetBedtime, wakeUpTime, lateNightReasons: selectedReasons });
+    await saveUserConfig({
+      hasOnboarded: true,
+      targetSleepTime: targetBedtime,
+      targetBedtime,
+      wakeUpTime,
+      lateNightReasons: selectedReasons
+    });
     router.replace("/");
   };
 

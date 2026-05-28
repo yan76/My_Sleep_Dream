@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { colors } from "@/constants/colors";
 
 type AppButtonProps = {
@@ -13,6 +13,9 @@ type AppButtonProps = {
 };
 
 export function AppButton({ title, onPress, variant = "primary", disabled, icon, style, size = "lg" }: AppButtonProps) {
+  const isGradientButton = variant === "primary" || variant === "gradient";
+  const usesWebGradient = isGradientButton && Platform.OS === "web";
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -21,19 +24,19 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
       style={({ pressed }) => [
         styles.base,
         styles[variant],
+        isGradientButton && webGradientStyle,
         size === "md" && styles.sizeMd,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style
       ]}
     >
-      {/* Gradient glow overlay for primary/gradient buttons */}
-      {(variant === "primary" || variant === "gradient") ? (
-        <View pointerEvents="none" style={styles.primaryGlow} />
-      ) : null}
-      {/* Secondary glow for gradient variant */}
-      {variant === "gradient" ? (
-        <View pointerEvents="none" style={styles.secondaryGlow} />
+      {isGradientButton && !usesWebGradient ? (
+        <>
+          <View pointerEvents="none" style={styles.gradientLeft} />
+          <View pointerEvents="none" style={styles.gradientBlend} />
+          <View pointerEvents="none" style={styles.gradientRight} />
+        </>
       ) : null}
       {icon}
       <Text style={[
@@ -46,6 +49,12 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
     </Pressable>
   );
 }
+
+const webGradientStyle = Platform.select({
+  web: {
+    backgroundImage: `linear-gradient(90deg, ${colors.accent} 0%, #F4ECDF 42%, #BFC4FF 70%, ${colors.primary} 100%)`
+  } as ViewStyle
+});
 
 const styles = StyleSheet.create({
   base: {
@@ -64,10 +73,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20
   },
   primary: {
-    backgroundColor: colors.accent
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.36)"
   },
   gradient: {
-    backgroundColor: colors.accent
+    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.36)"
   },
   secondary: {
     backgroundColor: colors.surfaceWarm,
@@ -84,27 +97,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,112,131,0.34)"
   },
-  primaryGlow: {
+  gradientLeft: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    width: "48%",
-    backgroundColor: colors.primary,
-    opacity: 0.82,
-    borderTopLeftRadius: 32,
-    borderBottomLeftRadius: 32
+    width: "58%",
+    backgroundColor: colors.accent
   },
-  secondaryGlow: {
+  gradientBlend: {
+    position: "absolute",
+    left: "42%",
+    top: 0,
+    bottom: 0,
+    width: "34%",
+    backgroundColor: "#F4ECDF",
+    opacity: 0.42
+  },
+  gradientRight: {
     position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    width: "22%",
-    backgroundColor: colors.success,
-    opacity: 0.30,
-    borderTopRightRadius: 32,
-    borderBottomRightRadius: 32
+    width: "42%",
+    backgroundColor: colors.primary,
+    opacity: 0.86
   },
   text: {
     color: colors.buttonText,

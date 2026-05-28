@@ -10,8 +10,10 @@ export type LateNightReason =
 
 export type UserConfig = {
   hasOnboarded: boolean;
+  targetSleepTime: string;
   targetBedtime: string;
   wakeUpTime: string;
+  reminderMinutesBefore: number;
   lateNightReasons: LateNightReason[];
   createdAt: string;
   updatedAt: string;
@@ -80,4 +82,65 @@ export type Badge = {
   description: string;
   unlocked: boolean;
   unlockedAt?: string;
+};
+
+export type RescueSessionStatus =
+  | "idle"
+  | "started"
+  | "in_rescue_flow"
+  | "in_shutdown_challenge"
+  | "in_relax_mode"
+  | "ready_to_sleep"
+  | "completed"
+  | "abandoned";
+
+export type RescueSession = {
+  id: string;
+  date: string;
+  status: RescueSessionStatus;
+  startedAt: string;
+  readyToSleepAt?: string;
+  completedAt?: string;
+  hasUrgeToScroll: boolean;
+  shutdownChallengeCompleted: boolean;
+  relaxModeUsed: boolean;
+  todayReviewCompleted?: boolean;
+  todayReviewCompletedAt?: string;
+  notes?: string;
+};
+
+export type TodayReview = {
+  id: string;
+  date: string;
+  sessionId: string;
+  happenedToday: string;
+  completedToday: string;
+  unfinishedToday: string;
+  tomorrowPlan: string;
+  closingNote: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SleepRecord = {
+  id: string;
+  date: string;
+  sessionId: string;
+  plannedSleepTime: string;
+  actualSleepTime?: string;
+  success: boolean;
+  reasonIfFailed?: string;
+  moodNextMorning?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AppStats = {
+  currentStreak: number;
+  longestStreak: number;
+  totalSuccessDays: number;
+  totalRescueSessions: number;
+  totalChallengeCompleted: number;
+  weeklySuccessCount: number;
+  monthlySuccessCount: number;
 };

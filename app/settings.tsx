@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Screen } from "@/components/common/Screen";
 import { TimePickerField } from "@/components/common/TimePickerField";
 import { colors } from "@/constants/colors";
+import { clearRescueStorage, saveUserConfig } from "@/storage/rescueSessionStorage";
 import { useAppStore } from "@/store/useAppStore";
 import { isValidTime } from "@/utils/date";
 
@@ -23,9 +24,15 @@ export default function SettingsScreen() {
   const [reminderTime, setReminderTime] = useState(reminderSettings.reminderTime);
   const [reminderEnabled, setReminderEnabled] = useState(reminderSettings.enabled);
 
-  const save = () => {
+  const save = async () => {
     updateConfig({ targetBedtime, wakeUpTime });
     updateReminderSettings({ reminderTime, enabled: reminderEnabled });
+    await saveUserConfig({
+      hasOnboarded: true,
+      targetSleepTime: targetBedtime,
+      targetBedtime,
+      wakeUpTime
+    });
     router.push("/");
   };
 
@@ -35,8 +42,9 @@ export default function SettingsScreen() {
       {
         text: "清空",
         style: "destructive",
-        onPress: () => {
+        onPress: async () => {
           clearAllData();
+          await clearRescueStorage();
           router.replace("/onboarding");
         }
       }
