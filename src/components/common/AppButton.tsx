@@ -5,13 +5,14 @@ import { colors } from "@/constants/colors";
 type AppButtonProps = {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "gradient";
   disabled?: boolean;
   icon?: ReactNode;
   style?: ViewStyle;
+  size?: "md" | "lg";
 };
 
-export function AppButton({ title, onPress, variant = "primary", disabled, icon, style }: AppButtonProps) {
+export function AppButton({ title, onPress, variant = "primary", disabled, icon, style, size = "lg" }: AppButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -20,14 +21,26 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
       style={({ pressed }) => [
         styles.base,
         styles[variant],
+        size === "md" && styles.sizeMd,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style
       ]}
     >
-      {variant === "primary" ? <View pointerEvents="none" style={styles.primaryGlow} /> : null}
+      {/* Gradient glow overlay for primary/gradient buttons */}
+      {(variant === "primary" || variant === "gradient") ? (
+        <View pointerEvents="none" style={styles.primaryGlow} />
+      ) : null}
+      {/* Secondary glow for gradient variant */}
+      {variant === "gradient" ? (
+        <View pointerEvents="none" style={styles.secondaryGlow} />
+      ) : null}
       {icon}
-      <Text style={[styles.text, variant !== "primary" && styles.darkText, disabled && styles.disabledText]}>
+      <Text style={[
+        styles.text,
+        (variant === "ghost" || variant === "secondary" || variant === "danger") && styles.darkText,
+        disabled && styles.disabledText
+      ]}>
         {title}
       </Text>
     </Pressable>
@@ -45,7 +58,15 @@ const styles = StyleSheet.create({
     gap: 8,
     overflow: "hidden"
   },
+  sizeMd: {
+    minHeight: 52,
+    borderRadius: 26,
+    paddingHorizontal: 20
+  },
   primary: {
+    backgroundColor: colors.accent
+  },
+  gradient: {
     backgroundColor: colors.accent
   },
   secondary: {
@@ -65,12 +86,25 @@ const styles = StyleSheet.create({
   },
   primaryGlow: {
     position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "48%",
+    backgroundColor: colors.primary,
+    opacity: 0.82,
+    borderTopLeftRadius: 32,
+    borderBottomLeftRadius: 32
+  },
+  secondaryGlow: {
+    position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    width: "46%",
-    backgroundColor: colors.primary,
-    opacity: 0.82
+    width: "22%",
+    backgroundColor: colors.success,
+    opacity: 0.30,
+    borderTopRightRadius: 32,
+    borderBottomRightRadius: 32
   },
   text: {
     color: colors.buttonText,

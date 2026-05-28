@@ -30,12 +30,14 @@ export type DailyStatus =
   | "bedtime_mode"
   | "slept_on_time"
   | "slept_late"
-  | "rescued";
+  | "rescued"
+  | "checked_in";
 
 export type DailyRecord = {
   date: string;
   plannedBedtime: string;
   actualSleepTime?: string;
+  actualWakeTime?: string;
   status: DailyStatus;
   contractConfirmedAt?: string;
   review?: {
@@ -52,6 +54,13 @@ export type DailyRecord = {
   };
   rescueCount: number;
   rescueSuccess: boolean;
+  checkin?: {
+    sleepQuality: number; // 1-5
+    morningMood: string;
+    reflection: string;
+    sleepDuration: string;
+    completedAt: string;
+  };
   note?: string;
   createdAt: string;
   updatedAt: string;

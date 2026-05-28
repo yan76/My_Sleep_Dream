@@ -8,7 +8,8 @@ export const statusLabels: Record<DailyStatus, string> = {
   bedtime_mode: "睡前模式中",
   slept_on_time: "按时睡",
   slept_late: "晚睡",
-  rescued: "已补救"
+  rescued: "已补救",
+  checked_in: "已打卡"
 };
 
 export function didSleepOnTime(actualTime: string, plannedBedtime: string): boolean {

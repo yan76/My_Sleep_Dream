@@ -1,9 +1,9 @@
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "@/constants/colors";
 
 type BottomNavProps = {
-  active: "home" | "review" | "rescue" | "audio" | "growth";
+  active: "home" | "review" | "rescue" | "audio" | "growth" | "checkin";
 };
 
 const navItems = [
@@ -20,12 +20,14 @@ export function BottomNav({ active }: BottomNavProps) {
       {navItems.map((item) => {
         const isActive = item.key === active;
         return (
-          <Link key={item.key} href={item.href} asChild>
-            <Pressable style={[styles.item, isActive && styles.activeItem]}>
-              <View style={[styles.dot, isActive && styles.activeDot]} />
-              <Text style={[styles.label, isActive && styles.activeLabel]}>{item.label}</Text>
-            </Pressable>
-          </Link>
+          <Pressable
+            key={item.key}
+            onPress={() => router.push(item.href)}
+            style={[styles.item, isActive && styles.activeItem]}
+          >
+            <View style={[styles.dot, isActive && styles.activeDot]} />
+            <Text style={[styles.label, isActive && styles.activeLabel]}>{item.label}</Text>
+          </Pressable>
         );
       })}
     </View>

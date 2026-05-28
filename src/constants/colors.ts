@@ -5,6 +5,8 @@ export const colors = {
   surfaceStrong: "rgba(255,255,255,0.1)",
   surfaceWarm: "rgba(224,210,178,0.16)",
   surfaceCool: "rgba(133,147,255,0.14)",
+  surfaceMint: "rgba(153,227,187,0.14)",
+  surfaceRose: "rgba(255,112,131,0.12)",
   ink: "#F6F6FF",
   muted: "#AEB1C9",
   line: "rgba(255,255,255,0.18)",
@@ -12,10 +14,15 @@ export const colors = {
   primary: "#8796FF",
   primaryDark: "#6F7EE8",
   accent: "#E3D4B5",
+  accentDark: "#C9B892",
   warning: "#F0C978",
   danger: "#FF7083",
   success: "#99E3BB",
   lavender: "#24223F",
   buttonText: "#10101B",
-  tabBar: "#070817"
+  tabBar: "#070817",
+  // Glow colors for UI design system
+  glowBlue: "rgba(120,132,205,0.12)",
+  glowGold: "rgba(227,212,181,0.08)",
+  glowGreen: "rgba(153,227,187,0.08)"
 };

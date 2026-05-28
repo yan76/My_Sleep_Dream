@@ -15,6 +15,13 @@ type ReviewInput = {
 
 type ChecklistInput = NonNullable<DailyRecord["bedtimeChecklist"]>;
 
+type CheckinInput = {
+  sleepQuality: number;
+  morningMood: string;
+  reflection: string;
+  actualWakeTime: string;
+};
+
 type AppStore = {
   userConfig: UserConfig;
   reminderSettings: ReminderSettings;
@@ -28,6 +35,7 @@ type AppStore = {
   saveReview: (review: ReviewInput) => void;
   saveBedtimeChecklist: (checklist: ChecklistInput, markReady?: boolean) => void;
   markRescueSuccess: () => void;
+  saveCheckin: (checkin: CheckinInput) => void;
   clearAllData: () => void;
 };
 
@@ -183,6 +191,25 @@ export const useAppStore = create<AppStore>()(
           status: "rescued",
           rescueCount: current.rescueCount + 1,
           rescueSuccess: true,
+          updatedAt: nowIso()
+        };
+        set((state) => applyRecordsWithBadges({ ...state.dailyRecords, [key]: record }, state.badges));
+      },
+
+      saveCheckin: (checkin) => {
+        const key = todayKey();
+        const current = get().dailyRecords[key] ?? createDailyRecord(get().userConfig.targetBedtime);
+        const actualSleepTime = current.actualSleepTime ?? nowTime();
+        const record: DailyRecord = {
+          ...current,
+          status: "checked_in",
+          actualSleepTime,
+          actualWakeTime: checkin.actualWakeTime,
+          checkin: {
+            ...checkin,
+            sleepDuration: "",
+            completedAt: nowIso()
+          },
           updatedAt: nowIso()
         };
         set((state) => applyRecordsWithBadges({ ...state.dailyRecords, [key]: record }, state.badges));

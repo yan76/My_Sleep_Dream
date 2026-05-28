@@ -9,15 +9,30 @@ type TonightGoalCardProps = {
 
 export function TonightGoalCard({ bedtime, wakeUpTime }: TonightGoalCardProps) {
   return (
-    <AppCard style={styles.card}>
-      <Text style={styles.label}>{bedtime} 前放下手机</Text>
+    <AppCard style={styles.card} topAccent>
+      <Text style={styles.label}>今晚目标：{bedtime} 前放下手机</Text>
       <View style={styles.row}>
         <Text style={styles.time}>42:00</Text>
         <View style={styles.progressTrack}>
           <View style={styles.progressFill} />
         </View>
       </View>
-      <Text style={styles.note}>距离今晚自救目标，明早 {wakeUpTime} 起。</Text>
+      <View style={styles.bottomRow}>
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>就寝</Text>
+          <Text style={styles.metaValue}>{bedtime}</Text>
+        </View>
+        <View style={styles.metaDivider} />
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>起床</Text>
+          <Text style={styles.metaValue}>{wakeUpTime}</Text>
+        </View>
+        <View style={styles.metaDivider} />
+        <View style={styles.metaItem}>
+          <Text style={styles.metaLabel}>进度</Text>
+          <Text style={styles.metaValue}>62%</Text>
+        </View>
+      </View>
     </AppCard>
   );
 }
@@ -29,7 +44,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.ink,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800"
   },
   row: {
@@ -56,9 +71,29 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.accent
   },
-  note: {
+  bottomRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 8
+  },
+  metaItem: {
+    alignItems: "center",
+    gap: 4
+  },
+  metaLabel: {
     color: colors.muted,
-    fontSize: 18,
-    lineHeight: 26
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  metaValue: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "800"
+  },
+  metaDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.line
   }
 });

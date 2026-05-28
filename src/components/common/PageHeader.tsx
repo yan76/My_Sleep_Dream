@@ -10,7 +10,12 @@ type PageHeaderProps = {
 export function PageHeader({ eyebrow, title, subtitle }: PageHeaderProps) {
   return (
     <View style={styles.wrap}>
-      {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+      {eyebrow ? (
+        <View style={styles.eyebrowRow}>
+          <View style={styles.eyebrowDot} />
+          <Text style={styles.eyebrow}>{eyebrow}</Text>
+        </View>
+      ) : null}
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
@@ -19,14 +24,26 @@ export function PageHeader({ eyebrow, title, subtitle }: PageHeaderProps) {
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 8,
+    gap: 10,
     paddingTop: 52
+  },
+  eyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  eyebrowDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accent
   },
   eyebrow: {
     color: colors.accent,
     fontSize: 13,
     fontWeight: "800",
-    letterSpacing: 0
+    letterSpacing: 1,
+    textTransform: "uppercase" as const
   },
   title: {
     color: colors.ink,
@@ -36,7 +53,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: colors.muted,
-    fontSize: 20,
-    lineHeight: 28
+    fontSize: 18,
+    lineHeight: 26
   }
 });

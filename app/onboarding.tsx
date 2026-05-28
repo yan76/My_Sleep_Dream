@@ -33,14 +33,21 @@ export default function OnboardingScreen() {
 
   return (
     <Screen>
+      {/* Decorative welcome badge */}
+      <View style={styles.welcomeBadge}>
+        <View style={styles.welcomeGlow} />
+        <Text style={styles.welcomeIcon}>🌙</Text>
+      </View>
+
       <PageHeader
         eyebrow="早睡自救局"
         title="先给今晚一个温柔边界"
         subtitle="不是发誓改命，只是把最容易滑走的夜晚，稍微扶稳一点。"
       />
 
-      <AppCard>
+      <AppCard topAccent>
         <TimePickerField label="目标睡觉时间" value={targetBedtime} onChange={setTargetBedtime} />
+        <View style={styles.dividerLine} />
         <TimePickerField label="起床时间" value={wakeUpTime} onChange={setWakeUpTime} />
       </AppCard>
 
@@ -62,16 +69,41 @@ export default function OnboardingScreen() {
         </View>
       </AppCard>
 
-      <AppButton title="开始今晚的自救" onPress={save} disabled={!isValid} />
+      <AppButton
+        title="开始今晚的自救"
+        variant="gradient"
+        onPress={save}
+        disabled={!isValid}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  welcomeBadge: {
+    alignItems: "center",
+    paddingTop: 20
+  },
+  welcomeGlow: {
+    position: "absolute",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.glowBlue,
+    top: 10
+  },
+  welcomeIcon: {
+    fontSize: 48
+  },
   cardTitle: {
     color: colors.ink,
     fontSize: 20,
     fontWeight: "800"
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: colors.line,
+    marginVertical: 4
   },
   reasonWrap: {
     flexDirection: "row",

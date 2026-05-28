@@ -13,8 +13,11 @@ export function Screen({ children, scroll = true }: ScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Decorative background orbs - misty glass glow style */}
       <View pointerEvents="none" style={styles.orbitOne} />
       <View pointerEvents="none" style={styles.orbitTwo} />
+      <View pointerEvents="none" style={styles.orbitThree} />
+      <View pointerEvents="none" style={styles.orbitFour} />
       {scroll ? (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {content}
@@ -40,7 +43,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
     paddingTop: 26,
     paddingBottom: 24,
     gap: 22
@@ -51,7 +54,7 @@ const styles = StyleSheet.create({
     height: 380,
     borderRadius: 190,
     borderWidth: 88,
-    borderColor: "rgba(120,132,205,0.1)",
+    borderColor: colors.glowBlue,
     right: -210,
     top: -70
   },
@@ -61,8 +64,29 @@ const styles = StyleSheet.create({
     height: 240,
     borderRadius: 120,
     borderWidth: 72,
-    borderColor: "rgba(120,132,205,0.08)",
+    borderColor: colors.glowBlue,
     right: -118,
     top: 10
+  },
+  orbitThree: {
+    position: "absolute",
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    borderWidth: 60,
+    borderColor: colors.glowGold,
+    left: -200,
+    bottom: -80
+  },
+  orbitFour: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 50,
+    borderColor: colors.glowGreen,
+    left: -90,
+    bottom: 40,
+    opacity: 0.5
   }
 });
