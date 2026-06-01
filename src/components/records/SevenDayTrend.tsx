@@ -1,27 +1,52 @@
 import { StyleSheet, Text, View } from "react-native";
 import { AppCard } from "@/components/common/AppCard";
 import { colors } from "@/constants/colors";
-import { DailyRecord } from "@/types/app";
-import { getLastSevenDays, statusLabels } from "@/utils/sleep";
+import { SleepRecord } from "@/types/app";
 
-export function SevenDayTrend({ records }: { records: Record<string, DailyRecord> }) {
-  const days = getLastSevenDays(records);
+type SevenDayTrendProps = {
+  records: SleepRecord[];
+  title?: string;
+};
+
+const dayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+
+function getDayOfWeek(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  return dayLabels[d.getDay()];
+}
+
+export function SevenDayTrend({ records, title = "近 7 天" }: SevenDayTrendProps) {
+  const displayRecords = records.slice(-7);
 
   return (
     <AppCard>
-      <Text style={styles.title}>近 7 天</Text>
+      <Text style={styles.title}>{title}</Text>
       <View style={styles.days}>
-        {days.map(({ date, record }) => {
-          const isGood = record?.status === "slept_on_time";
-          const isLate = record?.status === "slept_late";
+        {displayRecords.map((record) => {
+          const success = record.success;
+          const hasData = record.actualSleepTime != null;
           return (
-            <View key={date} style={styles.day}>
-              <View style={[styles.dot, isGood && styles.good, isLate && styles.late]} />
-              <Text style={styles.date}>{date.slice(5)}</Text>
-              <Text style={styles.status}>{record ? statusLabels[record.status] : "无记录"}</Text>
+            <View key={record.date} style={styles.day}>
+              <Text style={styles.dayLabel}>{getDayOfWeek(record.date)}</Text>
+              <View
+                style={[
+                  styles.dot,
+                  hasData && success && styles.dotSuccess,
+                  hasData && !success && styles.dotFail
+                ]}
+              />
+              <Text style={styles.date}>{record.date.slice(5)}</Text>
             </View>
           );
         })}
+        {displayRecords.length < 7 &&
+          Array.from({ length: 7 - displayRecords.length }).map((_, i) => (
+            <View key={`empty-${i}`} style={styles.day}>
+              <Text style={styles.dayLabel}>—</Text>
+              <View style={[styles.dot, styles.dotEmpty]} />
+              <Text style={styles.date}>—</Text>
+            </View>
+          ))}
       </View>
     </AppCard>
   );
@@ -36,32 +61,36 @@ const styles = StyleSheet.create({
   days: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 6
+    gap: 4
   },
   day: {
     flex: 1,
     alignItems: "center",
-    gap: 6
+    gap: 8
+  },
+  dayLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700"
   },
   dot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.line
   },
-  good: {
+  dotSuccess: {
     backgroundColor: colors.success
   },
-  late: {
-    backgroundColor: colors.warning
+  dotFail: {
+    backgroundColor: colors.danger
+  },
+  dotEmpty: {
+    backgroundColor: colors.line
   },
   date: {
     color: colors.muted,
-    fontSize: 11
-  },
-  status: {
-    color: colors.ink,
-    fontSize: 10,
-    textAlign: "center"
+    fontSize: 11,
+    fontWeight: "600"
   }
 });

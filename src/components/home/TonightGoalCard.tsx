@@ -13,7 +13,7 @@ export function TonightGoalCard({ bedtime, wakeUpTime }: TonightGoalCardProps) {
   const progress = Math.max(0, Math.min(100, 100 - (countdown.minutes / (24 * 60)) * 100));
 
   return (
-    <AppCard style={styles.card} topAccent>
+    <AppCard style={styles.card}>
       <Text style={styles.label}>今晚目标：{bedtime} 前放下手机</Text>
       <View style={styles.row}>
         <Text style={styles.time}>{countdown.label}</Text>
@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 10,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "#3F404C",  // 原 rgba(255,255,255,0.22) → 实体 hex
     overflow: "hidden"
   },
   progressFill: {

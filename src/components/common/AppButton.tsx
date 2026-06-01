@@ -21,6 +21,7 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
+      renderToHardwareTextureAndroid={true}
       style={({ pressed }) => [
         styles.base,
         styles[variant],
@@ -31,10 +32,11 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
         style
       ]}
     >
+      {/* 渐变按钮：用不重叠的纯色条模拟渐变，避免多层半透明叠加导致的色带 */}
       {isGradientButton && !usesWebGradient ? (
         <>
           <View pointerEvents="none" style={styles.gradientLeft} />
-          <View pointerEvents="none" style={styles.gradientBlend} />
+          <View pointerEvents="none" style={styles.gradientMid} />
           <View pointerEvents="none" style={styles.gradientRight} />
         </>
       ) : null}
@@ -52,7 +54,7 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
 
 const webGradientStyle = Platform.select({
   web: {
-    backgroundImage: `linear-gradient(90deg, ${colors.accent} 0%, #F4ECDF 42%, #BFC4FF 70%, ${colors.primary} 100%)`
+    backgroundImage: `linear-gradient(90deg, ${colors.accent} 0%, #F4ECDF 38%, #BFC4FF 70%, ${colors.primary} 100%)`
   } as ViewStyle
 });
 
@@ -73,60 +75,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20
   },
   primary: {
-    backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)"
+    backgroundColor: colors.primary
   },
   gradient: {
-    backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.36)"
+    backgroundColor: colors.primary
   },
   secondary: {
-    backgroundColor: colors.surfaceWarm,
-    borderWidth: 1,
-    borderColor: colors.lineStrong
+    backgroundColor: colors.surfaceWarm
   },
   ghost: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line
+    backgroundColor: colors.surface
   },
   danger: {
-    backgroundColor: "rgba(255,112,131,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,112,131,0.34)"
+    backgroundColor: "#2B1828"
   },
+  // 渐变三区：accent → blend → primary，全部使用纯色不重叠，无 View 级 opacity
   gradientLeft: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    width: "58%",
+    width: "48%",
     backgroundColor: colors.accent
   },
-  gradientBlend: {
+  gradientMid: {
     position: "absolute",
-    left: "42%",
+    left: "44%",
     top: 0,
     bottom: 0,
     width: "34%",
-    backgroundColor: "#F4ECDF",
-    opacity: 0.42
+    backgroundColor: "#E9DFC4"
   },
   gradientRight: {
     position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    width: "42%",
-    backgroundColor: colors.primary,
-    opacity: 0.86
+    width: "28%",
+    backgroundColor: "#96A3ED"
   },
   text: {
     color: colors.buttonText,
     fontSize: 18,
-    fontWeight: "800"
+    fontWeight: "800",
+    zIndex: 1
   },
   darkText: {
     color: colors.ink

@@ -3,6 +3,8 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 
+const bottomNavReservedSpace = 124;
+
 type ScreenProps = {
   children: ReactNode;
   scroll?: boolean;
@@ -13,11 +15,12 @@ export function Screen({ children, scroll = true }: ScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Decorative background orbs - misty glass glow style */}
-      <View pointerEvents="none" style={styles.orbitOne} />
-      <View pointerEvents="none" style={styles.orbitTwo} />
-      <View pointerEvents="none" style={styles.orbitThree} />
-      <View pointerEvents="none" style={styles.orbitFour} />
+      <View pointerEvents="none" style={styles.orbLayer}>
+        <View style={styles.orbitOne} />
+        <View style={styles.orbitTwo} />
+        <View style={styles.orbitThree} />
+        <View style={styles.orbitFour} />
+      </View>
       {scroll ? (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {content}
@@ -35,18 +38,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     overflow: "hidden"
   },
+  orbLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: -1,
+    overflow: "hidden"
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 18
+    paddingBottom: bottomNavReservedSpace
   },
   content: {
     width: "100%",
-    maxWidth: 560,
+    maxWidth: 430,
     alignSelf: "center",
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     paddingTop: 26,
-    paddingBottom: 24,
-    gap: 22
+    paddingBottom: 20,
+    gap: 20
   },
   orbitOne: {
     position: "absolute",
@@ -86,7 +94,7 @@ const styles = StyleSheet.create({
     borderWidth: 50,
     borderColor: colors.glowGreen,
     left: -90,
-    bottom: 40,
-    opacity: 0.5
+    bottom: 40
+    // 移除 View 级 opacity，glowGreen 已是纯色 hex
   }
 });

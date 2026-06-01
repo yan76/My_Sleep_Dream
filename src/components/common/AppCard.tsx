@@ -6,14 +6,15 @@ type AppCardProps = {
   children: ReactNode;
   tone?: "plain" | "warm" | "cool" | "lavender" | "mint" | "rose";
   style?: ViewStyle;
-  topAccent?: boolean;
 };
 
-export function AppCard({ children, tone = "plain", style, topAccent }: AppCardProps) {
+export function AppCard({ children, tone = "plain", style }: AppCardProps) {
   return (
-    <View style={[styles.card, styles[tone], style]}>
-      {topAccent ? <View style={styles.topAccent} /> : null}
-      {children}
+    <View
+      style={[styles.card, styles[tone], style]}
+      renderToHardwareTextureAndroid={true}
+    >
+      <View style={styles.inner}>{children}</View>
     </View>
   );
 }
@@ -21,20 +22,13 @@ export function AppCard({ children, tone = "plain", style, topAccent }: AppCardP
 const styles = StyleSheet.create({
   card: {
     borderRadius: 28,
-    padding: 22,
     borderWidth: 1,
     borderColor: colors.line,
-    gap: 14,
     overflow: "hidden"
   },
-  topAccent: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: colors.accent,
-    opacity: 0.6
+  inner: {
+    padding: 22,
+    gap: 14
   },
   plain: {
     backgroundColor: colors.surface

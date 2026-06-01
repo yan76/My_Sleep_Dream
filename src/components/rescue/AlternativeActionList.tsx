@@ -26,8 +26,6 @@ const styles = StyleSheet.create({
   row: {
     minHeight: 54,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.line,
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",

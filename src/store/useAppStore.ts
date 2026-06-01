@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { defaultSleepAidPreferences } from "@/constants/sleepAidPreferences";
 import { appStorage } from "@/storage/appStorage";
 import { storageKeys } from "@/storage/storageKeys";
 import { Badge, BadgeId, DailyRecord, ReminderSettings, UserConfig } from "@/types/app";
@@ -27,8 +28,18 @@ type AppStore = {
   reminderSettings: ReminderSettings;
   dailyRecords: Record<string, DailyRecord>;
   badges: Record<BadgeId, Badge>;
-  completeOnboarding: (input: Pick<UserConfig, "targetBedtime" | "wakeUpTime" | "lateNightReasons">) => void;
-  updateConfig: (input: Partial<Pick<UserConfig, "targetBedtime" | "targetSleepTime" | "wakeUpTime" | "lateNightReasons">>) => void;
+  completeOnboarding: (
+    input: Pick<UserConfig, "targetBedtime" | "wakeUpTime" | "lateNightReasons"> &
+      Partial<Pick<UserConfig, "reminderMinutesBefore" | "sleepAidPreferences">>
+  ) => void;
+  updateConfig: (
+    input: Partial<
+      Pick<
+        UserConfig,
+        "targetBedtime" | "targetSleepTime" | "wakeUpTime" | "lateNightReasons" | "reminderMinutesBefore" | "sleepAidPreferences"
+      >
+    >
+  ) => void;
   updateReminderSettings: (input: Partial<ReminderSettings>) => void;
   ensureTodayRecord: () => DailyRecord;
   confirmContract: (plannedBedtime: string) => void;
@@ -48,6 +59,7 @@ const defaultUserConfig: UserConfig = {
   wakeUpTime: "07:30",
   reminderMinutesBefore: 30,
   lateNightReasons: [],
+  sleepAidPreferences: defaultSleepAidPreferences,
   createdAt: nowIso(),
   updatedAt: nowIso()
 };
@@ -91,16 +103,22 @@ export const useAppStore = create<AppStore>()(
 
       completeOnboarding: (input) => {
         const now = nowIso();
+        const reminderMinutesBefore = input.reminderMinutesBefore ?? defaultReminderSettings.bedtimeModeReminderMinutesBefore;
         set({
           userConfig: {
             hasOnboarded: true,
             targetSleepTime: input.targetBedtime,
             targetBedtime: input.targetBedtime,
             wakeUpTime: input.wakeUpTime,
-            reminderMinutesBefore: defaultReminderSettings.bedtimeModeReminderMinutesBefore,
+            reminderMinutesBefore,
             lateNightReasons: input.lateNightReasons,
+            sleepAidPreferences: input.sleepAidPreferences ?? defaultSleepAidPreferences,
             createdAt: now,
             updatedAt: now
+          },
+          reminderSettings: {
+            ...defaultReminderSettings,
+            bedtimeModeReminderMinutesBefore: reminderMinutesBefore
           }
         });
       },
@@ -112,6 +130,7 @@ export const useAppStore = create<AppStore>()(
             ...input,
             targetSleepTime: input.targetSleepTime ?? input.targetBedtime ?? state.userConfig.targetSleepTime,
             targetBedtime: input.targetBedtime ?? input.targetSleepTime ?? state.userConfig.targetBedtime,
+            reminderMinutesBefore: input.reminderMinutesBefore ?? state.userConfig.reminderMinutesBefore,
             updatedAt: nowIso()
           }
         }));
@@ -239,7 +258,25 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: storageKeys.appState,
-      storage: createJSONStorage(() => appStorage)
+      storage: createJSONStorage(() => appStorage),
+      merge: (persisted, current) => {
+        const persistedState = persisted as Partial<AppStore> | undefined;
+
+        return {
+          ...current,
+          ...persistedState,
+          userConfig: {
+            ...defaultUserConfig,
+            ...persistedState?.userConfig,
+            reminderMinutesBefore: persistedState?.userConfig?.reminderMinutesBefore ?? defaultUserConfig.reminderMinutesBefore,
+            sleepAidPreferences: persistedState?.userConfig?.sleepAidPreferences ?? defaultSleepAidPreferences
+          },
+          reminderSettings: {
+            ...defaultReminderSettings,
+            ...persistedState?.reminderSettings
+          }
+        };
+      }
     }
   )
 );

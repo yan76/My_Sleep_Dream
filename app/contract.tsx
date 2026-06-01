@@ -38,7 +38,7 @@ export default function ContractScreen() {
       </AppCard>
 
       {/* Time picker */}
-      <AppCard topAccent>
+      <AppCard>
         <TimePickerField label="今晚计划睡觉时间" value={plannedBedtime} onChange={setPlannedBedtime} />
         <View style={styles.timeDisplay}>
           <Text style={styles.timeValue}>{plannedBedtime}</Text>
@@ -86,8 +86,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     borderWidth: 1,
-    borderColor: "rgba(133,147,255,0.2)",
-    opacity: 0.6
+    borderColor: "#171A35"  // #212547 60% → 避免 View 级 opacity
   },
   sleepOrbit2: {
     position: "absolute",
@@ -95,8 +94,7 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
     borderWidth: 1,
-    borderColor: "rgba(133,147,255,0.15)",
-    opacity: 0.4
+    borderColor: "#12162B"  // #1C1E3C 40% → 避免 View 级 opacity
   },
   catFace: {
     fontSize: 60
@@ -141,8 +139,6 @@ const styles = StyleSheet.create({
   },
   rewardTag: {
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.line,
     backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 10

@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>早睡自救局 - 新主流程 UI 原型</title>
+  <style>
+    :root {
+      --bg: #090A19;
+      --bg-deep: #10102B;
+      --surface: #161726;
+      --surface-strong: #212231;
+      --surface-warm: #2B2A31;
+      --surface-cool: #1A1D39;
+      --surface-mint: #1D2830;
+      --surface-rose: #261626;
+      --ink: #F6F6FF;
+      --muted: #AEB1C9;
+      --line: #353643;
+      --primary: #8796FF;
+      --accent: #E3D4B5;
+      --warning: #F0C978;
+      --danger: #FF7083;
+      --success: #99E3BB;
+      --button-text: #10101B;
+      --tab: #070817;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #050611;
+      color: var(--ink);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    .board {
+      min-height: 100vh;
+      padding: 44px;
+      background:
+        radial-gradient(circle at 20% 8%, #16192f 0, transparent 320px),
+        radial-gradient(circle at 88% 18%, #1a1a25 0, transparent 300px),
+        #050611;
+    }
+
+    .board-title {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.12;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .board-subtitle {
+      max-width: 880px;
+      margin: 0 0 34px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.75;
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(4, 390px);
+      gap: 36px;
+      align-items: start;
+    }
+
+    .phone-wrap { display: flex; flex-direction: column; gap: 12px; }
+
+    .screen-name {
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 900;
+      padding-left: 4px;
+    }
+
+    .phone {
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      border-radius: 42px;
+      border: 1px solid #2d2e3d;
+      background: var(--bg);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.46);
+      position: relative;
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 12%, rgba(227,212,181,0.08), transparent 150px),
+        radial-gradient(circle at 15% 6%, rgba(135,150,255,0.1), transparent 180px);
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      padding: 28px 22px 92px;
+      overflow: hidden;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 22px;
+    }
+
+    .time {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .ghost {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: var(--surface);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 31px;
+      line-height: 1.16;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      margin: 10px 0 18px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.58;
+      font-weight: 600;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: 28px;
+      padding: 20px;
+      margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .warm { background: var(--surface-warm); }
+    .cool { background: var(--surface-cool); }
+    .mint { background: var(--surface-mint); }
+    .rose { background: var(--surface-rose); }
+    .strong { background: var(--surface-strong); }
+
+    .hero-card {
+      min-height: 174px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background:
+        radial-gradient(circle at 88% 8%, rgba(227,212,181,0.18), transparent 90px),
+        var(--surface-warm);
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .big {
+      font-size: 28px;
+      line-height: 1.16;
+      font-weight: 900;
+      margin: 6px 0 6px;
+    }
+
+    .body {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 650;
+    }
+
+    .button {
+      min-height: 58px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 30px;
+      background: var(--accent);
+      color: var(--button-text);
+      font-size: 17px;
+      font-weight: 900;
+      margin-top: 14px;
+    }
+
+    .button.secondary {
+      background: var(--surface-strong);
+      color: var(--accent);
+      border: 1px solid var(--line);
+    }
+
+    .button.primary {
+      background: var(--primary);
+      color: #080916;
+    }
+
+    .row { display: flex; gap: 12px; }
+    .between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+
+    .mini {
+      flex: 1;
+      min-height: 92px;
+      border-radius: 22px;
+      background: var(--surface-strong);
+      padding: 16px;
+    }
+
+    .value {
+      color: var(--ink);
+      font-size: 22px;
+      font-weight: 900;
+      margin-top: 6px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: var(--surface-strong);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--line);
+      overflow: hidden;
+      margin: 14px 0 4px;
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .step-card {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      min-height: 96px;
+    }
+
+    .num {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--surface-strong);
+      color: var(--accent);
+      font-weight: 900;
+    }
+
+    .input {
+      min-height: 210px;
+      border-radius: 26px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 18px;
+      color: #757891;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-top: 18px;
+    }
+
+    .option {
+      flex: 1;
+      min-height: 124px;
+      border-radius: 24px;
+      padding: 16px;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      font-weight: 900;
+      background: rgba(227,212,181,0.14);
+      color: var(--accent);
+    }
+
+    .player {
+      height: 284px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .rings {
+      width: 168px;
+      height: 168px;
+      border-radius: 50%;
+      border: 1px solid var(--line-strong, #585963);
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle, rgba(135,150,255,0.18), transparent 70%);
+    }
+
+    .rings-inner {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      background: var(--surface-cool);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-size: 34px;
+      font-weight: 900;
+    }
+
+    .nav {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      height: 62px;
+      border-radius: 30px;
+      background: var(--tab);
+      border: 1px solid #1c1d2b;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      z-index: 2;
+    }
+
+    .nav span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .nav .active { color: var(--accent); }
+
+    .quote {
+      color: var(--ink);
+      font-size: 22px;
+      line-height: 1.42;
+      font-weight: 900;
+    }
+
+    .meter {
+      width: 160px;
+      height: 160px;
+      margin: 8px auto 22px;
+      border-radius: 50%;
+      border: 5px solid var(--line);
+      display: grid;
+      place-items: center;
+      background: var(--surface-cool);
+    }
+
+    .timer {
+      color: var(--accent);
+      font-size: 38px;
+      font-weight: 900;
+    }
+
+    .fact {
+      border-radius: 22px;
+      padding: 14px;
+      background: var(--surface-strong);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.45;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .story {
+      min-height: 230px;
+      background:
+        radial-gradient(circle at 90% 10%, rgba(153,227,187,0.12), transparent 120px),
+        var(--surface-mint);
+    }
+
+    @media (max-width: 1740px) {
+      .screens { grid-template-columns: repeat(3, 390px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <h1 class="board-title">早睡自救局 · 新主流程 UI 原型</h1>
+    <p class="board-subtitle">沿用当前项目深夜系视觉：深色背景、暖金主按钮、大圆角卡片、蓝紫/薄荷/玫瑰功能色块。新原型围绕“结束今天、进入睡意、看见自己正在变好”的核心闭环组织。</p>
+
+    <section class="screens">
+      <div class="phone-wrap">
+        <div class="screen-name">01 首页「今晚」</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="time"><span class="dot"></span>22:48</div><div class="ghost">设置</div></div>
+          <div class="eyebrow">今晚</div>
+          <h1>现在适合开始收尾了</h1>
+          <p class="sub">不用立刻睡，只要先把今天慢慢放下。</p>
+          <div class="card hero-card">
+            <div><div class="label">当前最该做的一件事</div><div class="big">开始今晚仪式</div><div class="body">大约 6 分钟，先收住外界，再把今天放在这里。</div></div>
+            <div class="button">开始今晚仪式</div>
+          </div>
+          <div class="row">
+            <div class="mini"><div class="label">目标睡觉</div><div class="value">23:30</div></div>
+            <div class="mini"><div class="label">建议开始</div><div class="value">23:00</div></div>
+          </div>
+          <div class="card cool"><div class="label">最近变化</div><div class="quote">这周你已经 3 次主动开始睡前仪式。</div><p class="body">你正在把夜晚一点点拿回来。</p></div>
+          <div class="row"><div class="option"><div class="icon">~</div><b>声音 Spa</b></div><div class="option"><div class="icon">2</div><b>下线挑战</b></div></div>
+          <div class="nav"><span class="active">首页</span><span>自救</span><span>成长</span><span>设置</span></div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">02 今晚仪式</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">返回</div><div class="pill">第 1 步 / 共 3 步</div></div>
+          <div class="eyebrow">今晚仪式</div>
+          <h1>先把外面的声音调小</h1>
+          <p class="sub">今天不用再接收那么多东西了。我们一步一步来。</p>
+          <div class="card">
+            <div class="between"><b>完成进度</b><b style="color:var(--accent)">1/3</b></div>
+            <div class="progress"><div class="fill" style="width:34%"></div></div>
+          </div>
+          <div class="card warm step-card"><div class="num">1</div><div><div class="big" style="font-size:21px">收住外界</div><div class="body">关闭正在刷的 App，把屏幕亮度调低。</div></div></div>
+          <div class="card step-card"><div class="num">2</div><div><div class="big" style="font-size:21px">把今天放下</div><div class="body">写下今天的故事、遗憾和明天一件事。</div></div></div>
+          <div class="card step-card"><div class="num">3</div><div><div class="big" style="font-size:21px">进入睡意</div><div class="body">选择声音 Spa、心理暗示或树洞陪聊。</div></div></div>
+          <div class="button">我已经收住外界</div>
+          <div class="button secondary">我还是想刷一会儿</div>
+          <div class="nav"><span>首页</span><span class="active">自救</span><span>成长</span><span>设置</span></div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">03 今日复盘「把今天放下」</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">上一步</div><div class="pill">2 / 4</div></div>
+          <div class="eyebrow">和今天道个晚安</div>
+          <h1>今天有没有一件值得肯定自己的小事？</h1>
+          <p class="sub">哪怕只是撑过来了，也算。写一句就好，不用漂亮。</p>
+          <div class="input">例如：今天虽然很累，但还是把重要的消息回完了。或者：我没有继续责怪自己。</div>
+          <div class="card cool"><div class="body">写下来不是为了复盘得多好，而是让它不用继续在脑子里转。</div></div>
+          <div class="button">下一步</div>
+          <div class="button secondary">今天太累了，极简记录</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">04 睡意生成器</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">仪式</div><div class="pill">推荐：心理暗示</div></div>
+          <div class="eyebrow">进入睡意</div>
+          <h1>现在，让身体慢慢睡着</h1>
+          <p class="sub">不需要努力睡着，只要选一种方式，让自己松下来。</p>
+          <div class="card warm"><div class="between"><div><div class="big" style="font-size:22px">睡前心理暗示</div><div class="body">3 分钟引导，把未完成的事交还给明天。</div></div><div class="pill">推荐</div></div></div>
+          <div class="row"><div class="option cool"><div class="icon">~</div><b>声音 Spa</b><span class="body">雨声、海浪、风声</span></div><div class="option rose"><div class="icon">AI</div><b>AI 树洞</b><span class="body">还有话没说完</span></div></div>
+          <div class="row"><div class="option"><div class="icon">*</div><b>白噪音</b><span class="body">低频稳定</span></div><div class="option"><div class="icon">S</div><b>ASMR 助眠</b><span class="body">会员预设</span></div></div>
+          <div class="button">开始心理暗示</div>
+          <div class="button secondary">我现在准备睡了</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">05 声音 Spa</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">返回</div><div class="pill">30 分钟后关闭</div></div>
+          <div class="eyebrow">声音 Spa</div>
+          <h1>夜雨正在播放</h1>
+          <p class="sub">把注意力从脑子里带出来，交给稳定的声音。</p>
+          <div class="card cool player"><div class="rings"><div class="rings-inner">~</div></div><div class="big">夜雨低频</div></div>
+          <div class="row"><div class="option warm"><b>夜雨</b><span class="body">当前</span></div><div class="option"><b>海浪</b><span class="body">柔和</span></div></div>
+          <div class="row"><div class="option"><b>风声</b><span class="body">轻</span></div><div class="option"><b>篝火</b><span class="body">暖</span></div></div>
+          <div class="card"><div class="body">不用追赶睡意，它会自己靠近。</div></div>
+          <div class="button">我准备睡了</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">06 AI 树洞预设</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">返回</div><div class="pill">会员预设</div></div>
+          <div class="eyebrow">AI 树洞</div>
+          <h1>还有话没说完吗？</h1>
+          <p class="sub">这里不会催你睡，也不会评价你。说一句也可以。</p>
+          <div class="input" style="min-height:150px">我今天其实有点委屈，但又不知道怎么说……</div>
+          <div class="card rose"><div class="label">AI 回声预览</div><div class="body">我听见的是，你不是不想放下，而是今天还有一点情绪没有被看见。先把它留在这里，今晚不用继续证明什么。</div></div>
+          <div class="button">帮我生成一句晚安暗示</div>
+          <div class="button secondary">谢谢，我准备睡了</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">07 下线挑战</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">关闭</div><div class="pill">重新选择</div></div>
+          <div class="eyebrow">下线挑战</div>
+          <h1>先暂停 2 分钟</h1>
+          <p class="sub">不是禁止你刷，只是先给自己一个重新选择的机会。</p>
+          <div class="meter"><div class="timer">1:24</div></div>
+          <div class="card warm"><div class="label">当前挑战</div><div class="big" style="font-size:24px">闭眼做 5 次深呼吸</div><div class="body">吸气 4 秒，停住 2 秒，呼气 6 秒。</div></div>
+          <div class="button">我回到今晚仪式</div>
+          <div class="button secondary">我还是想继续刷</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">08 次日打卡</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="time"><span class="dot"></span>08:12</div><div class="ghost">稍后</div></div>
+          <div class="eyebrow">次日打卡</div>
+          <h1>补录一下昨晚结果</h1>
+          <p class="sub">几十秒就好，这会帮你看见自己正在变好。</p>
+          <div class="card"><div class="label">昨晚大概几点睡着？</div><div class="value" style="font-size:44px;color:var(--accent)">23:42</div></div>
+          <div class="row"><div class="option mint"><b>接近目标</b><span class="body">差不多</span></div><div class="option"><b>晚了一点</b><span class="body">30 分钟内</span></div></div>
+          <div class="card cool"><div class="label">醒来感觉</div><div class="row" style="margin-top:12px"><span class="pill">精神不错</span><span class="pill">还可以</span><span class="pill">有点困</span></div></div>
+          <div class="button">生成昨晚反馈</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">09 昨晚反馈</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">首页</div><div class="pill">昨晚</div></div>
+          <div class="eyebrow">昨晚反馈</div>
+          <h1>昨晚你真的停下来了</h1>
+          <p class="sub">你在 23:42 左右睡下，虽然晚了一点，但完成了收尾。</p>
+          <div class="card mint"><div class="quote">这说明你不是失控了一整晚，你有在把自己往回带。</div></div>
+          <div class="card"><div class="label">和过去的自己相比</div><div class="big" style="font-size:24px">本周平均入睡提前 18 分钟</div><div class="body">连续几晚稳定收尾，会让身体重新相信夜晚是安全的。</div></div>
+          <div class="card warm"><div class="label">今晚建议</div><div class="body">今晚复盘时优先写“没完成的事”，再进入心理暗示。</div></div>
+          <div class="button">查看我的变化</div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">10 变好页</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">返回</div><div class="pill">本周</div></div>
+          <div class="eyebrow">我的夜晚正在变好</div>
+          <h1>不是每晚都完美，而是你越来越常把自己带回来</h1>
+          <div class="card warm"><div class="between"><div><div class="label">平均入睡</div><div class="value">提前 18 分钟</div></div><div class="pill">比上周</div></div></div>
+          <div class="fact">你已经 7 次完成睡前复盘</div>
+          <div class="fact">你已经 4 次在想刷手机时暂停下来</div>
+          <div class="fact">你有 3 天醒来感觉还不错</div>
+          <div class="card cool"><div class="big" style="font-size:23px">生成本周晚安总结</div><div class="body">看看这周的你，是怎么一点点把夜晚拿回来的。</div></div>
+          <div class="button">查看本周故事</div>
+          <div class="nav"><span>首页</span><span>自救</span><span class="active">成长</span><span>设置</span></div>
+        </div></div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-name">11 周总结</div>
+        <div class="phone"><div class="content">
+          <div class="top"><div class="ghost">返回</div><div class="pill">第 22 周</div></div>
+          <div class="eyebrow">本周晚安总结</div>
+          <h1>这一周，你在慢慢把夜晚还给自己</h1>
+          <div class="card story"><div class="body" style="color:var(--ink);font-size:16px;line-height:1.78">这周你有 4 晚开始了睡前仪式。周二你很累，但还是写下了明天要做的一件事。周四你差点继续刷手机，最后完成了下线挑战。你不是突然变得自律了，你是在学会温柔地停下来。</div></div>
+          <div class="row"><div class="mini"><div class="label">复盘</div><div class="value">4 次</div></div><div class="mini"><div class="label">挑战</div><div class="value">2 次</div></div></div>
+          <div class="card warm"><div class="label">下周一句建议</div><div class="body">试试把今晚仪式提前 10 分钟开始。</div></div>
+          <div class="button">保存这周的晚安总结</div>
+        </div></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

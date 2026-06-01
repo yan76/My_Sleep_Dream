@@ -1,5 +1,6 @@
 import { appStorage } from "@/storage/appStorage";
 import { storageKeys } from "@/storage/storageKeys";
+import { defaultSleepAidPreferences } from "@/constants/sleepAidPreferences";
 import {
   AppStats,
   LateNightReason,
@@ -18,7 +19,7 @@ type StoredTodayReviews = Record<string, TodayReview>;
 type SleepRecordInput = Partial<
   Pick<SleepRecord, "date" | "sessionId" | "plannedSleepTime" | "actualSleepTime" | "success" | "reasonIfFailed" | "moodNextMorning">
 >;
-type TodayReviewInput = Pick<TodayReview, "happenedToday" | "completedToday" | "unfinishedToday" | "tomorrowPlan">;
+type TodayReviewInput = Partial<Pick<TodayReview, "mood" | "happenedToday" | "completedToday" | "unfinishedToday" | "tomorrowPlan" | "affirmation" | "minimalMode">>;
 
 const DEFAULT_TARGET_SLEEP_TIME = "23:30";
 const DEFAULT_WAKE_UP_TIME = "07:30";
@@ -39,6 +40,7 @@ function createDefaultUserConfig(): UserConfig {
     wakeUpTime: DEFAULT_WAKE_UP_TIME,
     reminderMinutesBefore: DEFAULT_REMINDER_MINUTES_BEFORE,
     lateNightReasons: [],
+    sleepAidPreferences: defaultSleepAidPreferences,
     createdAt: now,
     updatedAt: now
   };
@@ -77,6 +79,7 @@ function normalizeUserConfig(config: Partial<UserConfig>): UserConfig {
     wakeUpTime: config.wakeUpTime ?? fallback.wakeUpTime,
     reminderMinutesBefore: config.reminderMinutesBefore ?? fallback.reminderMinutesBefore,
     lateNightReasons: config.lateNightReasons ?? fallback.lateNightReasons,
+    sleepAidPreferences: config.sleepAidPreferences ?? fallback.sleepAidPreferences,
     createdAt,
     updatedAt: config.updatedAt ?? createdAt
   };
@@ -97,6 +100,39 @@ function didMeetPlannedSleepTime(actualSleepTime: string | undefined, plannedSle
 function countSuccessSince(records: SleepRecord[], since: Date): number {
   const sinceKey = todayKey(since);
   return records.filter((record) => record.success && record.date >= sinceKey).length;
+}
+
+function averageSleepMinutes(records: SleepRecord[]): number | undefined {
+  const minutes = records
+    .map((record) => record.actualSleepTime)
+    .filter((time): time is string => Boolean(time))
+    .map((time) => {
+      const value = timeToMinutes(time);
+      return value < 12 * 60 ? value + 24 * 60 : value;
+    });
+
+  if (!minutes.length) {
+    return undefined;
+  }
+
+  return Math.round(minutes.reduce((sum, value) => sum + value, 0) / minutes.length);
+}
+
+function formatSleepMinutes(minutes?: number): string | undefined {
+  if (minutes === undefined) {
+    return undefined;
+  }
+
+  const normalized = minutes % (24 * 60);
+  const hour = Math.floor(normalized / 60);
+  const minute = normalized % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function recordsBetween(records: SleepRecord[], start: Date, end: Date): SleepRecord[] {
+  const startKey = todayKey(start);
+  const endKey = todayKey(end);
+  return records.filter((record) => record.date >= startKey && record.date <= endKey);
 }
 
 function calculateStreaks(records: SleepRecord[]) {
@@ -194,6 +230,13 @@ export async function updateTodaySession(input: Partial<RescueSession>): Promise
   return next;
 }
 
+export async function updateTodayRitualStep(ritualStep: number): Promise<RescueSession> {
+  return updateTodaySession({
+    ritualStep,
+    status: "in_rescue_flow"
+  });
+}
+
 export async function updateTodaySessionStatus(status: RescueSessionStatus): Promise<RescueSession> {
   const timestamps: Partial<RescueSession> = {};
 
@@ -222,6 +265,22 @@ export async function markShutdownChallengeCompleted(): Promise<RescueSession> {
 export async function markRelaxModeUsed(): Promise<RescueSession> {
   return updateTodaySession({
     relaxModeUsed: true,
+    status: "in_relax_mode"
+  });
+}
+
+export async function markSleepGeneratorUsed(sleepAidChoice?: string): Promise<RescueSession> {
+  return updateTodaySession({
+    sleepGeneratorUsed: true,
+    sleepAidChoice,
+    status: "in_relax_mode"
+  });
+}
+
+export async function markTreeHoleUsed(): Promise<RescueSession> {
+  return updateTodaySession({
+    treeHoleUsed: true,
+    sleepAidChoice: "AI 树洞",
     status: "in_relax_mode"
   });
 }
@@ -257,11 +316,14 @@ export async function saveTodayReview(input: TodayReviewInput): Promise<TodayRev
     id: current?.id ?? todayReviewIdForDate(date),
     date,
     sessionId: session.id,
-    happenedToday: input.happenedToday,
-    completedToday: input.completedToday,
-    unfinishedToday: input.unfinishedToday,
-    tomorrowPlan: input.tomorrowPlan,
+    mood: input.mood,
+    happenedToday: input.happenedToday ?? "",
+    completedToday: input.completedToday ?? "",
+    unfinishedToday: input.unfinishedToday ?? "",
+    tomorrowPlan: input.tomorrowPlan ?? "",
     closingNote: DEFAULT_CLOSING_NOTE,
+    affirmation: input.affirmation ?? current?.affirmation,
+    minimalMode: input.minimalMode ?? current?.minimalMode,
     createdAt: current?.createdAt ?? now,
     updatedAt: now
   };
@@ -371,8 +433,17 @@ export async function shouldShowMorningCheckIn(): Promise<boolean> {
 export async function getAppStats(): Promise<AppStats> {
   const records = await getSleepRecords();
   const sessions = Object.values(await getRescueSessions());
+  const reviews = Object.values(await getTodayReviewMap());
   const { currentStreak, longestStreak } = calculateStreaks(records);
   const now = new Date();
+  const weekStart = addDays(now, -6);
+  const previousWeekStart = addDays(now, -13);
+  const previousWeekEnd = addDays(now, -7);
+  const weekStartKey = todayKey(weekStart);
+  const weeklyRecords = recordsBetween(records, weekStart, now);
+  const previousWeeklyRecords = recordsBetween(records, previousWeekStart, previousWeekEnd);
+  const currentAverage = averageSleepMinutes(weeklyRecords);
+  const previousAverage = averageSleepMinutes(previousWeeklyRecords);
 
   return {
     currentStreak,
@@ -381,12 +452,21 @@ export async function getAppStats(): Promise<AppStats> {
     totalRescueSessions: sessions.length,
     totalChallengeCompleted: sessions.filter((session) => session.shutdownChallengeCompleted).length,
     weeklySuccessCount: countSuccessSince(records, addDays(now, -6)),
-    monthlySuccessCount: countSuccessSince(records, addDays(now, -29))
+    monthlySuccessCount: countSuccessSince(records, addDays(now, -29)),
+    weeklyReviewCount: reviews.filter((review) => review.date >= weekStartKey).length,
+    weeklyChallengeCount: sessions.filter((session) => session.date >= weekStartKey && session.shutdownChallengeCompleted).length,
+    weeklyTreeHoleCount: sessions.filter((session) => session.date >= weekStartKey && session.treeHoleUsed).length,
+    averageSleepTime: formatSleepMinutes(currentAverage),
+    previousAverageSleepTime: formatSleepMinutes(previousAverage),
+    averageSleepDeltaMinutes:
+      currentAverage !== undefined && previousAverage !== undefined ? currentAverage - previousAverage : undefined,
+    goodMorningMoodCount: weeklyRecords.filter((record) => ["精神不错", "还可以"].includes(record.moodNextMorning ?? "")).length
   };
 }
 
 export async function clearRescueStorage(): Promise<void> {
   await Promise.all([
+    appStorage.removeItem(storageKeys.appState),
     appStorage.removeItem(storageKeys.userConfig),
     appStorage.removeItem(storageKeys.rescueSessions),
     appStorage.removeItem(storageKeys.todayReviews),

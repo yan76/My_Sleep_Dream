@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   decorBar: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#1D1E2B",  // 原 rgba(255,255,255,0.08) → 实体 hex
     overflow: "hidden"
   },
   decorFill: {

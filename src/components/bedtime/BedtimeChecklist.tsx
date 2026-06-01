@@ -45,8 +45,6 @@ const styles = StyleSheet.create({
   row: {
     minHeight: 54,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.line,
     backgroundColor: colors.surface,
     paddingHorizontal: 14,
     flexDirection: "row",
@@ -54,21 +52,17 @@ const styles = StyleSheet.create({
     gap: 12
   },
   checked: {
-    backgroundColor: colors.surfaceCool,
-    borderColor: "#C9DDD5"
+    backgroundColor: colors.surfaceCool
   },
   box: {
     width: 24,
     height: 24,
     borderRadius: 7,
-    borderWidth: 1,
-    borderColor: colors.line,
     alignItems: "center",
     justifyContent: "center"
   },
   checkedBox: {
-    backgroundColor: colors.primaryDark,
-    borderColor: colors.primaryDark
+    backgroundColor: colors.primaryDark
   },
   mark: {
     color: colors.surface,

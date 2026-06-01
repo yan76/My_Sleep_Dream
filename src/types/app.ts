@@ -8,6 +8,13 @@ export type LateNightReason =
   | "anxiety"
   | "other";
 
+export type SleepAidPreference =
+  | "sound_spa"
+  | "suggestion"
+  | "tree_hole"
+  | "white_noise"
+  | "asmr";
+
 export type UserConfig = {
   hasOnboarded: boolean;
   targetSleepTime: string;
@@ -15,6 +22,7 @@ export type UserConfig = {
   wakeUpTime: string;
   reminderMinutesBefore: number;
   lateNightReasons: LateNightReason[];
+  sleepAidPreferences: SleepAidPreference[];
   createdAt: string;
   updatedAt: string;
 };
@@ -106,6 +114,10 @@ export type RescueSession = {
   relaxModeUsed: boolean;
   todayReviewCompleted?: boolean;
   todayReviewCompletedAt?: string;
+  ritualStep?: number;
+  sleepGeneratorUsed?: boolean;
+  treeHoleUsed?: boolean;
+  sleepAidChoice?: string;
   notes?: string;
 };
 
@@ -113,11 +125,14 @@ export type TodayReview = {
   id: string;
   date: string;
   sessionId: string;
+  mood?: string;
   happenedToday: string;
   completedToday: string;
   unfinishedToday: string;
   tomorrowPlan: string;
   closingNote: string;
+  affirmation?: string;
+  minimalMode?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -143,4 +158,11 @@ export type AppStats = {
   totalChallengeCompleted: number;
   weeklySuccessCount: number;
   monthlySuccessCount: number;
+  weeklyReviewCount: number;
+  weeklyChallengeCount: number;
+  weeklyTreeHoleCount: number;
+  averageSleepTime?: string;
+  previousAverageSleepTime?: string;
+  averageSleepDeltaMinutes?: number;
+  goodMorningMoodCount: number;
 };

@@ -4,6 +4,7 @@ import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, View, us
 const ARTBOARD_WIDTH = 780;
 const ARTBOARD_HEIGHT = 1690;
 const MAX_CANVAS_WIDTH = 430;
+const bottomNavReservedSpace = 124;
 
 type Hotspot = {
   x: number;
@@ -71,7 +72,8 @@ const styles = StyleSheet.create({
   },
   content: {
     alignItems: "center",
-    backgroundColor: "#050610"
+    backgroundColor: "#050610",
+    paddingBottom: bottomNavReservedSpace
   },
   canvas: {
     position: "relative",
