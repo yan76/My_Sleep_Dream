@@ -6,11 +6,12 @@ import { colors } from "@/constants/colors";
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" backgroundColor={colors.background} />
+      <StatusBar hidden backgroundColor={colors.background} />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: colors.background }
+          contentStyle: { backgroundColor: colors.background },
+          animation: "fade"
         }}
       />
     </SafeAreaProvider>
