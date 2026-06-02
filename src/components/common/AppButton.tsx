@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 import { colors } from "@/constants/colors";
 
 type AppButtonProps = {
@@ -14,7 +14,6 @@ type AppButtonProps = {
 
 export function AppButton({ title, onPress, variant = "primary", disabled, icon, style, size = "lg" }: AppButtonProps) {
   const isGradientButton = variant === "primary" || variant === "gradient";
-  const usesWebGradient = isGradientButton && Platform.OS === "web";
 
   return (
     <Pressable
@@ -25,21 +24,13 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
       style={({ pressed }) => [
         styles.base,
         styles[variant],
-        isGradientButton && webGradientStyle,
+        isGradientButton && gradientBackgroundStyle,
         size === "md" && styles.sizeMd,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style
       ]}
     >
-      {/* 渐变按钮：用不重叠的纯色条模拟渐变，避免多层半透明叠加导致的色带 */}
-      {isGradientButton && !usesWebGradient ? (
-        <>
-          <View pointerEvents="none" style={styles.gradientLeft} />
-          <View pointerEvents="none" style={styles.gradientMid} />
-          <View pointerEvents="none" style={styles.gradientRight} />
-        </>
-      ) : null}
       {icon}
       <Text style={[
         styles.text,
@@ -52,11 +43,9 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
   );
 }
 
-const webGradientStyle = Platform.select({
-  web: {
-    backgroundImage: `linear-gradient(90deg, ${colors.accent} 0%, #F4ECDF 38%, #BFC4FF 70%, ${colors.primary} 100%)`
-  } as ViewStyle
-});
+const gradientBackgroundStyle = {
+  backgroundImage: `linear-gradient(100deg, ${colors.accent} 0%, #F4ECDF 36%, #BFC4FF 68%, ${colors.primary} 100%)`
+} as ViewStyle;
 
 const styles = StyleSheet.create({
   base: {
@@ -88,31 +77,6 @@ const styles = StyleSheet.create({
   },
   danger: {
     backgroundColor: "#2B1828"
-  },
-  // 渐变三区：accent → blend → primary，全部使用纯色不重叠，无 View 级 opacity
-  gradientLeft: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "48%",
-    backgroundColor: colors.accent
-  },
-  gradientMid: {
-    position: "absolute",
-    left: "44%",
-    top: 0,
-    bottom: 0,
-    width: "34%",
-    backgroundColor: "#E9DFC4"
-  },
-  gradientRight: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: "28%",
-    backgroundColor: "#96A3ED"
   },
   text: {
     color: colors.buttonText,

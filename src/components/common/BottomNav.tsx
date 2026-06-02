@@ -16,7 +16,7 @@ const navItems = [
 type NavKey = (typeof navItems)[number]["key"];
 
 const activeTint = "#F0DDB9";
-const inactiveTint = "#777A98";
+const inactiveTint = "#9EA3C4";
 
 function NavIcon({ name, active }: { name: NavKey; active: boolean }) {
   const tint = active ? activeTint : inactiveTint;
@@ -78,36 +78,36 @@ export function BottomNav({ active }: BottomNavProps) {
 const styles = StyleSheet.create({
   bar: {
     width: "100%",
-    height: 92,
+    height: 104,
     paddingHorizontal: 42,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    paddingTop: 16,
+    paddingBottom: 18,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
     borderWidth: 1,
-    borderColor: "#242638",
-    backgroundColor: "#090A19",
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "#090B1B",
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between"
   },
   item: {
     width: 58,
-    height: 66,
+    height: 72,
     alignItems: "center",
     justifyContent: "flex-start",
-    gap: 3
+    gap: 4
   },
   iconWrap: {
     width: 38,
-    height: 36,
+    height: 38,
     alignItems: "center",
     justifyContent: "center"
   },
   label: {
     color: inactiveTint,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: "900"
   },
   activeLabel: {
