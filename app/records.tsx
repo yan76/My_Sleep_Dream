@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getRescueSessions,
@@ -32,6 +32,9 @@ const periodLabels: Record<GrowthDimension, string> = {
 };
 
 const periodOrder: GrowthDimension[] = ["week", "month", "all"];
+
+const streakBadge = require("../assets/badges/streak-badge.png");
+const noWhiteNightBadge = require("../assets/badges/no-white-night-badge.png");
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: object }) {
   return <View style={[styles.glassCard, style]}>{children}</View>;
@@ -179,12 +182,10 @@ function CircleMetric({ label, value, caption }: { label: string; value: string;
   );
 }
 
-function BadgeTile({ icon, title, caption }: { icon: string; title: string; caption: string }) {
+function BadgeTile({ image, title, caption }: { image: ImageSourcePropType; title: string; caption: string }) {
   return (
     <GlassCard style={styles.badgeTile}>
-      <View style={styles.badgeIcon}>
-        <Text style={styles.badgeIconText}>{icon}</Text>
-      </View>
+      <Image source={image} style={styles.badgeIcon} resizeMode="contain" />
       <View style={styles.badgeCopy}>
         <Text style={styles.badgeTitle}>{title}</Text>
         <Text style={styles.metricCaption}>{caption}</Text>
@@ -322,8 +323,8 @@ function WeekView({ stats, streak }: { stats: GrowthStats; streak: number }) {
         <CircleMetric label="不错" value={String(stats.goodMoodCount)} caption="睡来状态比较期待" />
       </View>
       <View style={styles.badgeGrid}>
-        <BadgeTile icon="★" title={`${Math.max(streak, 1)} 天连胜`} caption="连续完成睡前收尾" />
-        <BadgeTile icon="☾" title={stats.pauseCount > 0 ? "没白熬徽章" : "正在接近徽章"} caption="你开始把自己带回来了" />
+        <BadgeTile image={streakBadge} title={`${Math.max(streak, 1)} 天连胜`} caption="连续完成睡前收尾" />
+        <BadgeTile image={noWhiteNightBadge} title={stats.pauseCount > 0 ? "没白熬徽章" : "正在接近徽章"} caption="你开始把自己带回来了" />
       </View>
       <MoonAdvice
         title="这不是自律奇迹，是你真的开始学会爱惜自己了。"
@@ -850,23 +851,14 @@ const styles = StyleSheet.create({
   badgeTile: {
     flex: 1,
     minHeight: 114,
-    padding: 20,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 16
+    gap: 12
   },
   badgeIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#E6D5B8",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  badgeIconText: {
-    color: "#9B7522",
-    fontSize: 30,
-    fontWeight: "900"
+    width: 74,
+    height: 74
   },
   badgeCopy: {
     flex: 1,
