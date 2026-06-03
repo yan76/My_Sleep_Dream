@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
@@ -52,6 +52,8 @@ const PRIMARY_TOOLS = [
   { title: "声音 Spa", href: "/bedtime", tone: "cool", icon: "~" },
   { title: "下线挑战", href: "/shutdown-challenge", tone: "warm", icon: "2" }
 ] as const;
+
+const recentChangeBackground = require("../assets/ui/recent-change-nightscape.png");
 
 function isYesterday(dateKey: string): boolean {
   const yesterday = new Date();
@@ -370,11 +372,13 @@ export default function HomeScreen() {
         </View>
       </AppCard>
 
-      <AppCard tone="cool">
-        <Text style={styles.label}>最近变化</Text>
-        <Text style={styles.quote}>{viewModel.changeQuote}</Text>
-        <Text style={styles.body}>{viewModel.changeBody}</Text>
-      </AppCard>
+      <ImageBackground source={recentChangeBackground} style={styles.recentCard} imageStyle={styles.recentImage}>
+        <View style={styles.recentScrim} />
+        <View style={styles.recentCopy}>
+          <Text style={styles.recentQuote}>{viewModel.changeQuote}</Text>
+          <Text style={styles.recentBody}>{viewModel.changeBody}</Text>
+        </View>
+      </ImageBackground>
 
       <View style={styles.toolRow}>
         {PRIMARY_TOOLS.map((tool) => (
@@ -615,11 +619,53 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.primary
   },
-  quote: {
-    color: colors.ink,
+  recentCard: {
+    height: 178,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(84, 85, 124, 0.42)",
+    overflow: "hidden",
+    justifyContent: "flex-start",
+    backgroundColor: colors.surfaceCool,
+    shadowColor: "#000000",
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6
+  },
+  recentImage: {
+    width: "116%",
+    height: "138%",
+    left: "-8%",
+    top: "-19%",
+    borderRadius: 24
+  },
+  recentScrim: {
+    position: "absolute",
+    left: -2,
+    right: -2,
+    top: -2,
+    bottom: -2,
+    backgroundColor: "rgba(5, 6, 18, 0.04)"
+  },
+  recentCopy: {
+    width: "68%",
+    paddingLeft: 22,
+    paddingTop: 30,
+    paddingBottom: 20,
+    gap: 14
+  },
+  recentQuote: {
+    color: "#FFF1CF",
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "900"
+  },
+  recentBody: {
+    color: "rgba(230, 234, 255, 0.72)",
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "700"
   },
   toolRow: {
     flexDirection: "row",

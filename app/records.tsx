@@ -23,6 +23,7 @@ type MetricCardProps = {
   label: string;
   value: string;
   icon?: string;
+  valueColor?: string;
 };
 
 const periodLabels: Record<GrowthDimension, string> = {
@@ -35,6 +36,11 @@ const periodOrder: GrowthDimension[] = ["week", "month", "all"];
 
 const streakBadge = require("../assets/badges/streak-badge.png");
 const noWhiteNightBadge = require("../assets/badges/no-white-night-badge.png");
+const adviceBackground = require("../assets/ui/growth-advice-background.png");
+const monthCompareMoonscape = require("../assets/ui/month-compare-moonscape.png");
+const monthChangeClock = require("../assets/ui/month-change-clock.png");
+const monthChangePhone = require("../assets/ui/month-change-phone.png");
+const monthChangeSunrise = require("../assets/ui/month-change-sunrise.png");
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: object }) {
   return <View style={[styles.glassCard, style]}>{children}</View>;
@@ -152,14 +158,14 @@ function WeekTrend({ bars }: { bars: TrendBar[] }) {
       <View style={styles.barChart}>
         {bars.map((bar, index) => (
           <View key={`${bar.label}-${index}`} style={styles.barColumn}>
-            <View style={[styles.trendBar, { height: bar.height }, !bar.active && styles.trendBarMuted]}>
-              {bar.active ? (
-                <>
-                  <View style={styles.barGlowTop} />
-                  <View style={styles.barGlowBottom} />
-                </>
-              ) : null}
-            </View>
+            <View
+              style={[
+                styles.trendBar,
+                bar.active ? styles.trendBarActive : styles.trendBarMuted,
+                bar.active ? trendBarGradientStyle : trendBarMutedGradientStyle,
+                { height: bar.height }
+              ]}
+            />
             <Text style={styles.axisLabel}>{bar.label}</Text>
           </View>
         ))}
@@ -196,16 +202,26 @@ function BadgeTile({ image, title, caption }: { image: ImageSourcePropType; titl
 
 function MoonAdvice({ title, body, buttonTitle, onPress }: { title: string; body: string; buttonTitle: string; onPress: () => void }) {
   return (
-    <GlassCard style={styles.adviceCard}>
-      <View style={styles.adviceMoon}>
-        <Text style={styles.adviceMoonText}>☾</Text>
-      </View>
-      <View style={styles.adviceTextWrap}>
-        <Text style={styles.adviceTitle}>{title}</Text>
-        <Text style={styles.adviceBody}>{body}</Text>
+    <View style={styles.adviceBlock}>
+      <View style={[styles.glassCard, styles.adviceCard]}>
+        <Image source={adviceBackground} style={styles.adviceBackgroundImage} resizeMode="cover" />
+        <View style={styles.adviceScrim} />
+        <View style={styles.adviceForeground}>
+          <View style={styles.adviceMoonIcon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <View style={styles.moonBase} />
+            <View style={styles.moonCutout} />
+            <Text style={[styles.moonStar, styles.moonStarOne]}>✦</Text>
+            <Text style={[styles.moonStar, styles.moonStarTwo]}>✦</Text>
+            <Text style={[styles.moonStar, styles.moonStarThree]}>✦</Text>
+          </View>
+          <View style={styles.adviceTextWrap}>
+            <Text style={styles.adviceTitle}>{title}</Text>
+            <Text style={styles.adviceBody}>{body}</Text>
+          </View>
+        </View>
       </View>
       <GradientButton title={buttonTitle} onPress={onPress} />
-    </GlassCard>
+    </View>
   );
 }
 
@@ -218,7 +234,7 @@ function GradientButton({ title, onPress }: { title: string; onPress: () => void
   );
 }
 
-function MetricCard({ label, value, icon }: MetricCardProps) {
+function MetricCard({ label, value, icon, valueColor }: MetricCardProps) {
   return (
     <GlassCard style={styles.metricCard}>
       {icon ? (
@@ -227,7 +243,7 @@ function MetricCard({ label, value, icon }: MetricCardProps) {
         </View>
       ) : null}
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </GlassCard>
   );
 }
@@ -287,7 +303,7 @@ function LineTrend({ title, range, points, compact = false }: { title: string; r
   );
 }
 
-function ChangeList({ title, rows }: { title: string; rows: Array<{ icon: string; label: string; value: string }> }) {
+function ChangeList({ title, rows }: { title: string; rows: { icon?: string; image?: ImageSourcePropType; label: string; value: string }[] }) {
   return (
     <GlassCard style={styles.changeListCard}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -295,7 +311,11 @@ function ChangeList({ title, rows }: { title: string; rows: Array<{ icon: string
         {rows.map((row) => (
           <View key={row.label} style={styles.changeRow}>
             <View style={styles.changeIcon}>
-              <Text style={styles.changeIconText}>{row.icon}</Text>
+              {row.image ? (
+                <Image source={row.image} style={styles.changeIconImage} resizeMode="contain" />
+              ) : (
+                <Text style={styles.changeIconText}>{row.icon}</Text>
+              )}
             </View>
             <Text style={styles.changeLabel}>{row.label}</Text>
             <Text style={styles.changeValue}>{row.value}</Text>
@@ -345,29 +365,33 @@ function MonthView({ stats }: { stats: GrowthStats }) {
         subtitle="把每周的小进步放在一起，你会更清楚地看见变化。"
       />
       <View style={styles.metricGrid}>
-        <MetricCard label="平均入睡" value={stats.monthAverageLabel} />
+        <MetricCard label="平均入睡" value={stats.monthAverageLabel} valueColor="#F1DDAA" />
         <MetricCard label="稳定晚数" value={`${stats.stableNightCount} 晚`} />
         <MetricCard label="复盘完成" value={`${stats.cumulativeReviewCount} 次`} />
         <MetricCard label="精神不错" value={`${stats.goodMoodCount} 天`} />
       </View>
       <GlassCard style={styles.compareCard}>
         <View style={styles.moonScene}>
-          <Text style={styles.sceneMoon}>●</Text>
+          <Image source={monthCompareMoonscape} style={styles.monthCompareImage} resizeMode="contain" />
         </View>
         <View style={styles.compareCopy}>
-          <Text style={styles.cardLabel}>和上个月相比</Text>
-          <Text style={styles.compareTitle}>{stats.lessLateCount > 0 ? `少熬了 ${stats.lessLateCount} 晚` : "正在建立基线"}</Text>
-          <Text style={styles.cardBody}>固定开始睡前仪式后，晚睡失控的次数明显下降。</Text>
+          <View style={styles.compareHeader}>
+            <Text style={[styles.cardLabel, styles.compareLabel]}>和上个月相比</Text>
+            <StatusPill label={stats.monthStatusLabel.replace("正在变好", "更稳")} prefix="+" />
+          </View>
+          <Text style={styles.compareTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>
+            {stats.lessLateCount > 0 ? `少熬了 ${stats.lessLateCount} 晚` : "正在建立基线"}
+          </Text>
+          <Text style={[styles.cardBody, styles.compareBody]}>固定开始睡前仪式后，晚睡失控的次数明显下降。</Text>
         </View>
-        <StatusPill label={stats.monthStatusLabel.replace("正在变好", "更稳")} prefix="+" />
       </GlassCard>
       <LineTrend title="4 周变化趋势" range="W1 → W4" points={stats.monthPoints} />
       <ChangeList
         title="这一月最明显的变化"
         rows={[
-          { icon: "☾", label: "更常在 23:30 前开始收尾", value: `${stats.startBeforeTargetCount} 次` },
-          { icon: "▯", label: "想刷手机时暂停下来", value: `${stats.pauseCount} 次` },
-          { icon: "☼", label: "醒来觉得“还不错”", value: `${stats.goodMoodCount} 天` }
+          { image: monthChangeClock, label: "更常在 23:30 前开始收尾", value: `${stats.startBeforeTargetCount} 次` },
+          { image: monthChangePhone, label: "想刷手机时暂停下来", value: `${stats.pauseCount} 次` },
+          { image: monthChangeSunrise, label: "醒来觉得“还不错”", value: `${stats.goodMoodCount} 天` }
         ]}
       />
       <MoonAdvice
@@ -406,9 +430,9 @@ function AllView({ stats }: { stats: GrowthStats }) {
       <ChangeList
         title="这些变化已经越来越稳定"
         rows={[
-          { icon: "◷", label: "更常在 23:30 前开始收尾", value: `${stats.startBeforeTargetCount} 次` },
-          { icon: "▯", label: "想刷手机时暂停下来", value: `${stats.pauseCount} 次` },
-          { icon: "☼", label: "醒来觉得还不错", value: `${stats.goodMoodCount} 天` }
+          { image: monthChangeClock, label: "更常在 23:30 前开始收尾", value: `${stats.startBeforeTargetCount} 次` },
+          { image: monthChangePhone, label: "想刷手机时暂停下来", value: `${stats.pauseCount} 次` },
+          { image: monthChangeSunrise, label: "醒来觉得还不错", value: `${stats.goodMoodCount} 天` }
         ]}
       />
       <MoonAdvice
@@ -527,6 +551,15 @@ export default function RecordsScreen() {
 
 const gradientBackgroundStyle = {
   backgroundImage: "linear-gradient(100deg, #E6D5B8 0%, #F4ECDF 35%, #BFC4FF 68%, #8A97FF 100%)"
+} as ViewStyle;
+
+const trendBarGradientStyle = {
+  backgroundImage: "linear-gradient(180deg, #F4E1B9 0%, #ECE7DC 22%, #A8B1FF 58%, #627AFF 100%)",
+  boxShadow: "0 0 18px rgba(132,148,255,0.28)"
+} as ViewStyle;
+
+const trendBarMutedGradientStyle = {
+  backgroundImage: "linear-gradient(180deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.055) 100%)"
 } as ViewStyle;
 
 const styles = StyleSheet.create({
@@ -743,9 +776,11 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   weekTrendCard: {
-    minHeight: 292,
-    padding: 28,
-    gap: 28
+    minHeight: 306,
+    paddingHorizontal: 24,
+    paddingTop: 26,
+    paddingBottom: 24,
+    gap: 24
   },
   sectionHeader: {
     flexDirection: "row",
@@ -765,33 +800,28 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   barChart: {
-    height: 202,
+    height: 188,
     flexDirection: "row",
     alignItems: "flex-end",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    paddingHorizontal: 4
   },
   barColumn: {
     width: 34,
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 18
+    gap: 16
   },
   trendBar: {
-    width: 24,
-    borderRadius: 13,
-    overflow: "hidden",
-    backgroundColor: "#E7DEC8"
+    width: 28,
+    borderRadius: 14,
+    overflow: "hidden"
+  },
+  trendBarActive: {
+    backgroundColor: "#A9B2FF"
   },
   trendBarMuted: {
-    backgroundColor: "rgba(255,255,255,0.09)"
-  },
-  barGlowTop: {
-    flex: 1,
-    backgroundColor: "#E6D5B8"
-  },
-  barGlowBottom: {
-    height: "48%",
-    backgroundColor: "#7D8EFF"
+    backgroundColor: "rgba(255,255,255,0.08)"
   },
   axisLabel: {
     color: "#A6ABBF",
@@ -870,29 +900,80 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     fontWeight: "900"
   },
-  adviceCard: {
-    padding: 26,
-    gap: 20,
-    borderColor: "rgba(230,213,184,0.32)"
+  adviceBlock: {
+    gap: 14
   },
-  adviceMoon: {
-    position: "absolute",
-    left: 28,
-    top: 30,
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    alignItems: "center",
+  adviceCard: {
+    minHeight: 160,
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
+    borderColor: "rgba(230,213,184,0.32)",
     justifyContent: "center"
   },
-  adviceMoonText: {
-    color: "#E6D5B8",
-    fontSize: 62,
-    lineHeight: 70,
+  adviceBackgroundImage: {
+    position: "absolute",
+    left: -8,
+    top: -20,
+    width: "106%",
+    height: "130%"
+  },
+  adviceScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(7,8,23,0.1)"
+  },
+  adviceForeground: {
+    zIndex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 22
+  },
+  adviceMoonIcon: {
+    width: 62,
+    height: 72,
+    position: "relative"
+  },
+  moonBase: {
+    position: "absolute",
+    left: 8,
+    top: 10,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F0DCA9"
+  },
+  moonCutout: {
+    position: "absolute",
+    left: 27,
+    top: 4,
+    width: 43,
+    height: 43,
+    borderRadius: 22,
+    backgroundColor: "#37303A"
+  },
+  moonStar: {
+    position: "absolute",
+    color: "#F0DCA9",
+    fontSize: 11,
+    lineHeight: 13,
     fontWeight: "900"
   },
+  moonStarOne: {
+    right: 6,
+    top: 6
+  },
+  moonStarTwo: {
+    left: 0,
+    bottom: 8,
+    opacity: 0.78
+  },
+  moonStarThree: {
+    right: 10,
+    bottom: 0,
+    opacity: 0.72
+  },
   adviceTextWrap: {
-    paddingLeft: 96,
+    flex: 1,
     gap: 14
   },
   adviceTitle: {
@@ -908,11 +989,12 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   gradientButton: {
-    minHeight: 64,
-    borderRadius: 32,
+    minHeight: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden"
+    overflow: "hidden",
+    zIndex: 2
   },
   gradientButtonText: {
     color: "#10101B",
@@ -968,11 +1050,15 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   compareCard: {
-    minHeight: 164,
-    padding: 28,
+    minHeight: 132,
+    paddingLeft: 12,
+    paddingRight: 18,
+    paddingVertical: 15,
     flexDirection: "row",
     alignItems: "center",
-    gap: 20
+    gap: 10,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.07)"
   },
   compareLargeCard: {
     minHeight: 176,
@@ -983,27 +1069,42 @@ const styles = StyleSheet.create({
     gap: 18
   },
   moonScene: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: "rgba(138,151,255,0.12)",
+    width: 116,
+    height: 92,
+    marginLeft: -10,
     alignItems: "center",
     justifyContent: "center"
   },
-  sceneMoon: {
-    color: "#E6D5B8",
-    fontSize: 44,
-    lineHeight: 48
+  monthCompareImage: {
+    width: 132,
+    height: 104
   },
   compareCopy: {
     flex: 1,
+    minWidth: 0,
+    gap: 3
+  },
+  compareHeader: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8
+  },
+  compareLabel: {
+    flexShrink: 1,
+    fontSize: 14,
+    lineHeight: 20
   },
   compareTitle: {
     color: "#E6D5B8",
-    fontSize: 34,
-    lineHeight: 44,
+    fontSize: 28,
+    lineHeight: 35,
     fontWeight: "900"
+  },
+  compareBody: {
+    fontSize: 14,
+    lineHeight: 21
   },
   lineTrendCard: {
     minHeight: 288,
@@ -1081,6 +1182,10 @@ const styles = StyleSheet.create({
     color: "#E6D5B8",
     fontSize: 22,
     fontWeight: "900"
+  },
+  changeIconImage: {
+    width: 34,
+    height: 34
   },
   changeLabel: {
     flex: 1,
