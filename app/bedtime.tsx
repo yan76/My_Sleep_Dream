@@ -1,14 +1,20 @@
 import { router } from "expo-router";
 import { PrototypeScreen } from "@/components/prototype/PrototypeScreen";
 import { markReadyToSleep, markSleepGeneratorUsed } from "@/storage/rescueSessionStorage";
+import {
+  markReadyToSleep as markExecutionReadyToSleep,
+  markSleepAidStarted
+} from "@/storage/dailyExecutionStorage";
 
 export default function BedtimeScreen() {
   const chooseSound = async (choice: string) => {
     await markSleepGeneratorUsed(choice);
+    await markSleepAidStarted({ aid: "sound_spa" });
   };
 
   const readyToSleep = async () => {
     await markReadyToSleep();
+    await markExecutionReadyToSleep();
     router.replace("/rescue");
   };
 

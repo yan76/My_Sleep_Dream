@@ -1,15 +1,22 @@
 import { router } from "expo-router";
 import { PrototypeScreen } from "@/components/prototype/PrototypeScreen";
 import { markReadyToSleep, markTreeHoleUsed } from "@/storage/rescueSessionStorage";
+import {
+  markReadyToSleep as markExecutionReadyToSleep,
+  markSleepAidStarted
+} from "@/storage/dailyExecutionStorage";
 
 export default function TreeHoleScreen() {
   const generateGoodNightHint = async () => {
     await markTreeHoleUsed();
+    await markSleepAidStarted({ aid: "tree_hole" });
   };
 
   const readyToSleep = async () => {
     await markTreeHoleUsed();
+    await markSleepAidStarted({ aid: "tree_hole" });
     await markReadyToSleep();
+    await markExecutionReadyToSleep();
     router.replace("/rescue");
   };
 

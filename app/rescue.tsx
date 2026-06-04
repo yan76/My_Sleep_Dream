@@ -13,6 +13,12 @@ import {
   startTodaySession,
   updateTodayRitualStep
 } from "@/storage/rescueSessionStorage";
+import {
+  markExternalClosed,
+  markReadyToSleep as markExecutionReadyToSleep,
+  markRescuePause,
+  markRitualStarted
+} from "@/storage/dailyExecutionStorage";
 import { RescueSession, UserConfig } from "@/types/app";
 import { getReasonBasedRescueHint, getSuggestedRescueTime } from "@/utils/sleepPreferences";
 
@@ -203,6 +209,7 @@ export default function RescueScreen() {
     setIsWorking(true);
     try {
       const session = data?.session ?? (await startTodaySession());
+      await markRitualStarted();
 
       if (session.status === "ready_to_sleep") {
         router.push("/");
@@ -211,6 +218,7 @@ export default function RescueScreen() {
 
       if (session.sleepGeneratorUsed || session.relaxModeUsed || session.treeHoleUsed) {
         await markReadyToSleep();
+        await markExecutionReadyToSleep();
         await loadData();
         return;
       }
@@ -244,6 +252,7 @@ export default function RescueScreen() {
     setIsWorking(true);
     try {
       await updateTodayRitualStep(1);
+      await markExternalClosed();
       setShowExternalCloseDialog(false);
       await loadData();
     } finally {
@@ -259,6 +268,8 @@ export default function RescueScreen() {
     setIsWorking(true);
     try {
       await startTodaySession();
+      await markRitualStarted();
+      await markRescuePause();
       await markUrgeToScroll();
       router.push("/shutdown-challenge");
     } finally {

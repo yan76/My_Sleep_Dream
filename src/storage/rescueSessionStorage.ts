@@ -1,8 +1,10 @@
 import { appStorage } from "@/storage/appStorage";
 import { storageKeys } from "@/storage/storageKeys";
 import { defaultSleepAidPreferences } from "@/constants/sleepAidPreferences";
+import { clearSleepAudioSessions } from "@/storage/sleepAudioStorage";
 import {
   AppStats,
+  DailyExecutionRecord,
   LateNightReason,
   RescueSession,
   RescueSessionStatus,
@@ -15,6 +17,7 @@ import { addDays, timeToMinutes, todayKey } from "@/utils/date";
 type StoredRescueSessions = Record<string, RescueSession>;
 type StoredSleepRecords = Record<string, SleepRecord>;
 type StoredTodayReviews = Record<string, TodayReview>;
+type StoredDailyExecutionRecords = Record<string, DailyExecutionRecord>;
 
 type SleepRecordInput = Partial<
   Pick<SleepRecord, "date" | "sessionId" | "plannedSleepTime" | "actualSleepTime" | "success" | "reasonIfFailed" | "moodNextMorning">
@@ -127,6 +130,79 @@ function formatSleepMinutes(minutes?: number): string | undefined {
   const hour = Math.floor(normalized / 60);
   const minute = normalized % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function timeWithOffset(time: string, offsetMinutes: number): string {
+  const next = (timeToMinutes(time) + offsetMinutes + 24 * 60) % (24 * 60);
+  const hour = Math.floor(next / 60);
+  const minute = next % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function isoForDateTime(date: string, time: string): string {
+  return `${date}T${time}:00.000`;
+}
+
+function dateTimeForDateKey(date: string, time: string): Date {
+  const [hours, minutes] = time.split(":").map(Number);
+  const next = new Date(`${date}T00:00:00`);
+  next.setHours(hours, minutes, 0, 0);
+  return next;
+}
+
+async function getDailyExecutionRecordMap(): Promise<StoredDailyExecutionRecords> {
+  return readJson<StoredDailyExecutionRecords>(storageKeys.dailyExecutionRecords, {});
+}
+
+function findNextGrowthTestDate(existingDates: Set<string>): string {
+  const now = new Date();
+  const weekDay = now.getDay() || 7;
+  const weekStart = addDays(now, 1 - weekDay);
+  const weekEnd = addDays(weekStart, 6);
+  const candidates: string[] = [];
+
+  for (let offset = 0; offset <= 6; offset += 1) {
+    const date = addDays(now, offset);
+    if (date <= weekEnd) {
+      candidates.push(todayKey(date));
+    }
+  }
+
+  for (let offset = -1; offset >= -6; offset -= 1) {
+    const date = addDays(now, offset);
+    if (date >= weekStart) {
+      candidates.push(todayKey(date));
+    }
+  }
+
+  for (let offset = 7; offset <= 30; offset += 1) {
+    const date = addDays(now, offset);
+    if (date.getMonth() === now.getMonth()) {
+      candidates.push(todayKey(date));
+    }
+  }
+
+  for (let offset = -7; offset >= -60; offset -= 1) {
+    const date = addDays(now, offset);
+    if (date.getMonth() === now.getMonth()) {
+      candidates.push(todayKey(date));
+    }
+  }
+
+  for (const date of candidates) {
+    if (!existingDates.has(date)) {
+      return date;
+    }
+  }
+
+  for (let offset = -61; offset >= -365; offset -= 1) {
+    const date = todayKey(addDays(now, offset));
+    if (!existingDates.has(date)) {
+      return date;
+    }
+  }
+
+  return todayKey(addDays(now, -existingDates.size - 1));
 }
 
 function recordsBetween(records: SleepRecord[], start: Date, end: Date): SleepRecord[] {
@@ -406,95 +482,151 @@ export async function createOrUpdateSleepRecord(input: SleepRecordInput = {}): P
 }
 
 export async function seedGrowthTestData(): Promise<void> {
-  const [config, records, sessions, reviews] = await Promise.all([
+  const [config, records, sessions, reviews, executionRecords] = await Promise.all([
     getUserConfig(),
     getSleepRecordMap(),
     getRescueSessions(),
-    getTodayReviewMap()
+    getTodayReviewMap(),
+    getDailyExecutionRecordMap()
   ]);
   const now = nowIso();
   const nextRecords: StoredSleepRecords = { ...records };
   const nextSessions: StoredRescueSessions = { ...sessions };
   const nextReviews: StoredTodayReviews = { ...reviews };
-  const sleepTimes = ["23:55", "23:42", "23:30", "23:18", "23:08", "22:58", "22:50", "00:06", "23:36", "23:04", "22:48", "22:42"];
-  const moods = ["精神不错", "还可以", "有点困", "精神不错"];
-  const existingDates = Object.keys(nextRecords).sort();
-  const batchEnd = existingDates.length ? addDays(new Date(`${existingDates[0]}T00:00:00`), -1) : new Date();
+  const nextExecutionRecords: StoredDailyExecutionRecords = { ...executionRecords };
+  const existingDates = new Set([
+    ...Object.keys(nextRecords),
+    ...Object.keys(nextSessions),
+    ...Object.keys(nextReviews),
+    ...Object.keys(nextExecutionRecords)
+  ]);
+  const date = findNextGrowthTestDate(existingDates);
+  const sessionId = sessionIdForDate(date);
+  const dateStart = new Date(`${date}T00:00:00`);
+  const ritualStartedAt = isoForDateTime(date, timeWithOffset(config.targetSleepTime, -60));
+  const externalClosedAt = isoForDateTime(date, timeWithOffset(config.targetSleepTime, -45));
+  const reviewCompletedAt = isoForDateTime(date, timeWithOffset(config.targetSleepTime, -35));
+  const sleepAidStartedAt = isoForDateTime(date, timeWithOffset(config.targetSleepTime, -15));
+  const readyToSleepAt = isoForDateTime(date, config.targetSleepTime);
+  const checkinCompletedAt = isoForDateTime(todayKey(addDays(dateStart, 1)), config.wakeUpTime);
 
-  sleepTimes.forEach((actualSleepTime, index) => {
-    const date = todayKey(addDays(batchEnd, index - sleepTimes.length + 1));
-    const sessionId = sessionIdForDate(date);
-    const success = didMeetPlannedSleepTime(actualSleepTime, config.targetSleepTime);
-    const timestamp = `${date}T22:30:00.000Z`;
+  nextExecutionRecords[date] = {
+    date,
+    plannedSleepTime: config.targetSleepTime,
+    wakeUpTime: config.wakeUpTime,
+    status: "checked_in",
+    ritualStartedAt,
+    externalClosedAt,
+    reviewCompletedAt,
+    sleepAidStartedAt,
+    readyToSleepAt,
+    checkinCompletedAt,
+    usedSoundSpa: true,
+    usedTreeHole: false,
+    usedSleepGenerator: true,
+    shutdownChallengeCount: 1,
+    rescuePauseCount: 0,
+    actualSleepTime: config.targetSleepTime,
+    sleepResult: "near_target",
+    morningMood: "okay",
+    createdAt: ritualStartedAt,
+    updatedAt: now
+  };
 
-    nextSessions[date] = {
-      id: sessionId,
-      date,
-      status: success ? "completed" : "ready_to_sleep",
-      startedAt: timestamp,
-      readyToSleepAt: `${date}T${actualSleepTime}:00.000Z`,
-      completedAt: success ? now : undefined,
-      hasUrgeToScroll: index % 3 === 0,
-      shutdownChallengeCompleted: index % 2 === 0,
-      relaxModeUsed: index % 4 === 0,
-      todayReviewCompleted: index % 2 === 1,
-      todayReviewCompletedAt: index % 2 === 1 ? timestamp : undefined
-    };
+  nextSessions[date] = {
+    id: sessionId,
+    date,
+    status: "completed",
+    startedAt: ritualStartedAt,
+    readyToSleepAt,
+    completedAt: readyToSleepAt,
+    hasUrgeToScroll: true,
+    shutdownChallengeCompleted: true,
+    relaxModeUsed: true,
+    todayReviewCompleted: true,
+    todayReviewCompletedAt: reviewCompletedAt,
+    ritualStep: 1,
+    sleepGeneratorUsed: true,
+    sleepAidChoice: "声音 Spa"
+  };
 
-    nextRecords[date] = {
-      id: sleepRecordIdForDate(date),
-      date,
-      sessionId,
-      plannedSleepTime: config.targetSleepTime,
-      actualSleepTime,
-      success,
-      reasonIfFailed: success ? undefined : "睡前刷手机",
-      moodNextMorning: moods[index % moods.length],
-      createdAt: timestamp,
-      updatedAt: now
-    };
+  nextRecords[date] = {
+    id: sleepRecordIdForDate(date),
+    date,
+    sessionId,
+    plannedSleepTime: config.targetSleepTime,
+    actualSleepTime: config.targetSleepTime,
+    success: true,
+    moodNextMorning: "还可以",
+    createdAt: checkinCompletedAt,
+    updatedAt: now
+  };
 
-    if (index % 2 === 1) {
-      nextReviews[date] = {
-        id: todayReviewIdForDate(date),
-        date,
-        sessionId,
-        mood: moods[index % moods.length],
-        happenedToday: "完成了一次睡前复盘",
-        completedToday: "按计划收尾",
-        unfinishedToday: "留给明天继续",
-        tomorrowPlan: "提前开始睡前流程",
-        closingNote: DEFAULT_CLOSING_NOTE,
-        affirmation: "慢慢变好也很好",
-        minimalMode: false,
-        createdAt: timestamp,
-        updatedAt: now
-      };
-    }
-  });
+  nextReviews[date] = {
+    id: todayReviewIdForDate(date),
+    date,
+    sessionId,
+    mood: "还可以",
+    happenedToday: "完成了一次睡前复盘",
+    completedToday: "按计划收尾并进入助眠流程",
+    unfinishedToday: "留给明天继续推进",
+    tomorrowPlan: "提前开始睡前流程",
+    closingNote: DEFAULT_CLOSING_NOTE,
+    affirmation: "慢慢变好也很好",
+    minimalMode: false,
+    createdAt: reviewCompletedAt,
+    updatedAt: now
+  };
 
   await Promise.all([
     writeJson(storageKeys.sleepRecords, nextRecords),
     writeJson(storageKeys.rescueSessions, nextSessions),
-    writeJson(storageKeys.todayReviews, nextReviews)
+    writeJson(storageKeys.todayReviews, nextReviews),
+    writeJson(storageKeys.dailyExecutionRecords, nextExecutionRecords)
   ]);
 }
 
 export async function getMorningCheckInDate(): Promise<string | null> {
-  const hour = new Date().getHours();
-  if (hour < 5 || hour >= 14) {
-    return null;
+  const now = new Date();
+  const nowTime = now.getTime();
+  const backfillWindowMs = 48 * 60 * 60 * 1000;
+  const [records, sessions, executionRecords] = await Promise.all([
+    getSleepRecordMap(),
+    getRescueSessions(),
+    getDailyExecutionRecordMap()
+  ]);
+
+  const executionCandidate = Object.values(executionRecords)
+    .filter((record) => {
+      if (!["ready_to_sleep", "needs_checkin"].includes(record.status) || record.checkinCompletedAt) {
+        return false;
+      }
+
+      const wakeDate = todayKey(addDays(new Date(`${record.date}T00:00:00`), 1));
+      const wakeAt = dateTimeForDateKey(wakeDate, record.wakeUpTime);
+      const elapsed = nowTime - wakeAt.getTime();
+      return elapsed >= 0 && elapsed <= backfillWindowMs;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+  if (executionCandidate) {
+    return executionCandidate.date;
   }
 
-  const checkInDate = todayKey(addDays(new Date(), -1));
-  const records = await getSleepRecordMap();
-  if (records[checkInDate]) {
-    return null;
-  }
+  const sessionCandidate = Object.values(sessions)
+    .filter((session) => {
+      if (!["ready_to_sleep", "completed"].includes(session.status) || records[session.date]) {
+        return false;
+      }
 
-  const sessions = await getRescueSessions();
-  const session = sessions[checkInDate];
-  return session && ["ready_to_sleep", "completed"].includes(session.status) ? checkInDate : null;
+      const wakeDate = todayKey(addDays(new Date(`${session.date}T00:00:00`), 1));
+      const wakeAt = dateTimeForDateKey(wakeDate, DEFAULT_WAKE_UP_TIME);
+      const elapsed = nowTime - wakeAt.getTime();
+      return elapsed >= 0 && elapsed <= backfillWindowMs;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+  return sessionCandidate?.date ?? null;
 }
 
 export async function hasTodaySessionStarted(): Promise<boolean> {
@@ -550,7 +682,9 @@ export async function clearRescueStorage(): Promise<void> {
     appStorage.removeItem(storageKeys.userConfig),
     appStorage.removeItem(storageKeys.rescueSessions),
     appStorage.removeItem(storageKeys.todayReviews),
-    appStorage.removeItem(storageKeys.sleepRecords)
+    appStorage.removeItem(storageKeys.sleepRecords),
+    appStorage.removeItem(storageKeys.dailyExecutionRecords),
+    clearSleepAudioSessions()
   ]);
 }
 

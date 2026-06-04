@@ -6,6 +6,7 @@ import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { SleepAidOption } from "@/constants/sleepAidPreferences";
 import { getUserConfig, markSleepGeneratorUsed, markTreeHoleUsed } from "@/storage/rescueSessionStorage";
+import { markSleepAidStarted } from "@/storage/dailyExecutionStorage";
 import { UserConfig } from "@/types/app";
 import { getRecommendedSleepAids } from "@/utils/sleepPreferences";
 
@@ -74,8 +75,10 @@ export default function SleepGeneratorScreen() {
     try {
       if (aid.route === "/tree-hole") {
         await markTreeHoleUsed();
+        await markSleepAidStarted({ aid: "tree_hole" });
       } else {
         await markSleepGeneratorUsed(aid.label);
+        await markSleepAidStarted({ aid: aid.id });
       }
       router.push(aid.route);
     } finally {
@@ -91,6 +94,7 @@ export default function SleepGeneratorScreen() {
     setIsChoosing(true);
     try {
       await markSleepGeneratorUsed(primaryAid?.label ?? "睡意生成器");
+      await markSleepAidStarted({ aid: primaryAid?.id ?? "sleep_generator" });
       router.replace("/rescue");
     } finally {
       setIsChoosing(false);

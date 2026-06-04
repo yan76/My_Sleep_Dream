@@ -15,6 +15,20 @@ export type SleepAidPreference =
   | "white_noise"
   | "asmr";
 
+export type DailyExecutionStatus =
+  | "not_started"
+  | "ritual_started"
+  | "external_closed"
+  | "review_completed"
+  | "sleep_aid_started"
+  | "ready_to_sleep"
+  | "needs_checkin"
+  | "checked_in";
+
+export type SleepResult = "near_target" | "slightly_late" | "very_late";
+
+export type MorningMood = "good" | "okay" | "tired";
+
 export type UserConfig = {
   hasOnboarded: boolean;
   targetSleepTime: string;
@@ -146,6 +160,72 @@ export type SleepRecord = {
   success: boolean;
   reasonIfFailed?: string;
   moodNextMorning?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DailyExecutionRecord = {
+  date: string;
+  plannedSleepTime: string;
+  wakeUpTime: string;
+  status: DailyExecutionStatus;
+  ritualStartedAt?: string;
+  externalClosedAt?: string;
+  reviewCompletedAt?: string;
+  sleepAidStartedAt?: string;
+  readyToSleepAt?: string;
+  checkinCompletedAt?: string;
+  usedSoundSpa: boolean;
+  usedTreeHole: boolean;
+  usedSleepGenerator: boolean;
+  shutdownChallengeCount: number;
+  rescuePauseCount: number;
+  actualSleepTime?: string;
+  sleepResult?: SleepResult;
+  morningMood?: MorningMood;
+  lateReason?: LateNightReason;
+  sleepAudioEnabled?: boolean;
+  sleepAudioSessionId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SleepAudioSessionStatus =
+  | "idle"
+  | "permission_denied"
+  | "recording"
+  | "stopped"
+  | "completed"
+  | "failed";
+
+export type SleepAudioEventType =
+  | "voice_like"
+  | "snore_like"
+  | "noise_like"
+  | "unknown";
+
+export type SleepAudioEvent = {
+  id: string;
+  startedAt: string;
+  durationMs: number;
+  type: SleepAudioEventType;
+  confidence?: number;
+  localClipUri?: string;
+};
+
+export type SleepAudioSession = {
+  id: string;
+  date: string;
+  status: SleepAudioSessionStatus;
+  startedAt?: string;
+  stoppedAt?: string;
+  eventCount: number;
+  events: SleepAudioEvent[];
+  summary?: {
+    hasVoiceLikeSound: boolean;
+    hasSnoreLikeSound: boolean;
+    quietScore?: number;
+  };
   createdAt: string;
   updatedAt: string;
 };

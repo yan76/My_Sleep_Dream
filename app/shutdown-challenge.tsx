@@ -1,10 +1,12 @@
 import { router } from "expo-router";
 import { PrototypeScreen } from "@/components/prototype/PrototypeScreen";
 import { markShutdownChallengeCompleted } from "@/storage/rescueSessionStorage";
+import { markDailyShutdownChallengeCompleted } from "@/storage/dailyExecutionStorage";
 
 export default function ShutdownChallengeScreen() {
   const completeChallenge = async () => {
     await markShutdownChallengeCompleted();
+    await markDailyShutdownChallengeCompleted();
     router.replace("/rescue");
   };
 

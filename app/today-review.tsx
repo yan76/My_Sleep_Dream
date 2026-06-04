@@ -6,6 +6,7 @@ import { Screen } from "@/components/common/Screen";
 import { SoftInputPanel } from "@/components/common/SoftInputPanel";
 import { colors } from "@/constants/colors";
 import { getTodayReview, saveTodayReview } from "@/storage/rescueSessionStorage";
+import { markReviewCompleted } from "@/storage/dailyExecutionStorage";
 
 type Draft = {
   happenedToday: string;
@@ -164,6 +165,7 @@ export default function TodayReviewScreen() {
               minimalMode: false
             }
       );
+      await markReviewCompleted();
       router.replace(returnPath);
     } finally {
       setIsSaving(false);

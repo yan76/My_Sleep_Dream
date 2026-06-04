@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -9,11 +9,21 @@ import {
   getUserConfig,
   seedGrowthTestData
 } from "@/storage/rescueSessionStorage";
-import { RescueSession, SleepRecord, TodayReview, UserConfig } from "@/types/app";
-import { buildGrowthStats, getCurrentSleepStreak, GrowthDimension, GrowthStats, TrendBar, TrendPoint } from "@/utils/growth";
+import { getDailyExecutionRecords } from "@/storage/dailyExecutionStorage";
+import { DailyExecutionRecord, RescueSession, SleepRecord, TodayReview, UserConfig } from "@/types/app";
+import {
+  buildGrowthStatsFromExecutionRecords,
+  getCurrentExecutionStreak,
+  getCurrentSleepStreak,
+  GrowthDimension,
+  GrowthStats,
+  TrendBar,
+  TrendPoint
+} from "@/utils/growth";
 
 type GrowthData = {
   records: SleepRecord[];
+  executionRecords: DailyExecutionRecord[];
   sessions: Record<string, RescueSession>;
   reviews: TodayReview[];
   config: UserConfig;
@@ -445,7 +455,17 @@ function AllView({ stats }: { stats: GrowthStats }) {
   );
 }
 
-function Content({ dimension, stats, records }: { dimension: GrowthDimension; stats: GrowthStats; records: SleepRecord[] }) {
+function Content({
+  dimension,
+  stats,
+  records,
+  executionRecords
+}: {
+  dimension: GrowthDimension;
+  stats: GrowthStats;
+  records: SleepRecord[];
+  executionRecords: DailyExecutionRecord[];
+}) {
   if (dimension === "month") {
     return <MonthView stats={stats} />;
   }
@@ -454,7 +474,7 @@ function Content({ dimension, stats, records }: { dimension: GrowthDimension; st
     return <AllView stats={stats} />;
   }
 
-  return <WeekView stats={stats} streak={getCurrentSleepStreak(records)} />;
+  return <WeekView stats={stats} streak={getCurrentExecutionStreak(executionRecords) || getCurrentSleepStreak(records)} />;
 }
 
 export default function RecordsScreen() {
@@ -464,45 +484,49 @@ export default function RecordsScreen() {
   const [periodExpanded, setPeriodExpanded] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      const [records, sessions, reviews, config] = await Promise.all([
-        getSleepRecords(),
-        getRescueSessions(),
-        getTodayReviews(),
-        getUserConfig()
-      ]);
-
-      if (mounted) {
-        setData({ records, sessions, reviews, config });
-        setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const reloadData = async () => {
-    const [records, sessions, reviews, config] = await Promise.all([
+  const reloadData = useCallback(async () => {
+    const [records, executionRecords, sessions, reviews, config] = await Promise.all([
       getSleepRecords(),
+      getDailyExecutionRecords(),
       getRescueSessions(),
       getTodayReviews(),
       getUserConfig()
     ]);
-    setData({ records, sessions, reviews, config });
+    setData({ records, executionRecords, sessions, reviews, config });
     setLoading(false);
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      async function load() {
+        const [records, executionRecords, sessions, reviews, config] = await Promise.all([
+          getSleepRecords(),
+          getDailyExecutionRecords(),
+          getRescueSessions(),
+          getTodayReviews(),
+          getUserConfig()
+        ]);
+
+        if (active) {
+          setData({ records, executionRecords, sessions, reviews, config });
+          setLoading(false);
+        }
+      }
+
+      load();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const stats = useMemo(() => {
     if (!data) {
       return null;
     }
-    return buildGrowthStats(data.records, data.sessions, data.reviews, data.config);
+    return buildGrowthStatsFromExecutionRecords(data.executionRecords, data.records, data.sessions, data.reviews, data.config);
   }, [data]);
 
   const changeDimension = (next: GrowthDimension) => {
@@ -541,7 +565,7 @@ export default function RecordsScreen() {
               <Text style={styles.loadingText}>正在整理你的成长记录</Text>
             </View>
           ) : (
-            <Content dimension={dimension} stats={stats} records={data.records} />
+            <Content dimension={dimension} stats={stats} records={data.records} executionRecords={data.executionRecords} />
           )}
         </View>
       </ScrollView>

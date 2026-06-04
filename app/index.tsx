@@ -14,8 +14,10 @@ import {
   getUserConfig,
   startTodaySession
 } from "@/storage/rescueSessionStorage";
+import { getSleepAudioSessionByDate } from "@/storage/sleepAudioStorage";
+import { markRitualStarted } from "@/storage/dailyExecutionStorage";
 import { useAppStore } from "@/store/useAppStore";
-import { AppStats, RescueSession, SleepRecord, UserConfig } from "@/types/app";
+import { AppStats, RescueSession, SleepAudioSession, SleepRecord, UserConfig } from "@/types/app";
 import { formatMinutes, minutesUntil, nowTime, todayKey } from "@/utils/date";
 import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
 
@@ -35,6 +37,7 @@ type HomeViewModel = {
   subtitle: string;
   statusLabel: string;
   action: HomeAction;
+  secondaryAction?: HomeAction;
   changeQuote: string;
   changeBody: string;
 };
@@ -44,6 +47,8 @@ type HomeData = {
   session: RescueSession | null;
   morningCheckInDate: string | null;
   latestSleepRecord: SleepRecord | null;
+  todayAudioSession: SleepAudioSession | null;
+  morningAudioSession: SleepAudioSession | null;
   stats: AppStats;
   weeklyRitualCount: number;
 };
@@ -99,7 +104,7 @@ function buildRecentChange(data: Pick<HomeData, "stats" | "weeklyRitualCount">):
 }
 
 function buildHomeState(data: HomeData): HomeViewModel {
-  const { userConfig, session, morningCheckInDate, latestSleepRecord } = data;
+  const { userConfig, session, morningCheckInDate, latestSleepRecord, todayAudioSession, morningAudioSession } = data;
   const recentChange = buildRecentChange(data);
   const currentHour = new Date().getHours();
   const hasFreshFeedback =
@@ -109,15 +114,42 @@ function buildHomeState(data: HomeData): HomeViewModel {
   const isInBedtimeWindow = countdownMinutes <= reminderMinutes;
 
   if (morningCheckInDate) {
+    const audioHint = morningAudioSession?.status
+      ? "昨晚有声音线索，打卡后可以一起看看。"
+      : "记录醒来的感觉，也是在把昨晚温柔收好。";
+
     return {
       title: "补录一下昨晚结果",
       subtitle: "几十秒就好，这会帮你看见自己正在变好。",
       statusLabel: "次日打卡",
       action: {
         title: "开始次日打卡",
-        description: "记录昨晚大概几点睡着，以及今天醒来的感觉。",
+        description: audioHint,
         buttonTitle: "开始次日打卡",
         href: "/checkin"
+      },
+      ...recentChange
+    };
+  }
+
+  if (session?.status === "ready_to_sleep") {
+    const audioStarted = todayAudioSession?.status === "recording";
+
+    return {
+      title: "今晚已经收好了",
+      subtitle: "接下来不用再证明什么，睡觉就是今晚最后一步。",
+      statusLabel: "等待明早补录",
+      action: {
+        title: "明早再来补一笔",
+        description: "明早醒来后，再记录昨晚的实际结果。补录后会生成昨晚反馈，并计入成长记录。",
+        buttonTitle: "明早再来补一笔",
+        disabled: true
+      },
+      secondaryAction: {
+        title: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
+        description: "只在本机记录声音摘要，不上传云端；不开启也不影响次日打卡。",
+        buttonTitle: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
+        href: "/sleep-monitor" as RouteTarget
       },
       ...recentChange
     };
@@ -151,21 +183,6 @@ function buildHomeState(data: HomeData): HomeViewModel {
         buttonTitle: isInBedtimeWindow ? "开始今晚仪式" : "提前开始",
         href: "/rescue",
         startsSession: true
-      },
-      ...recentChange
-    };
-  }
-
-  if (session.status === "ready_to_sleep") {
-    return {
-      title: "今晚已经收好了",
-      subtitle: "接下来不用再证明什么，等明天醒来补一笔就好。",
-      statusLabel: "准备睡觉",
-      action: {
-        title: "等待次日打卡",
-        description: "明早醒来后，再记录昨晚的实际结果。",
-        buttonTitle: "等待次日打卡",
-        disabled: true
       },
       ...recentChange
     };
@@ -254,8 +271,21 @@ export default function HomeScreen() {
     weekStart.setDate(weekStart.getDate() - 6);
     const weekStartKey = todayKey(weekStart);
     const weeklyRitualCount = Object.values(sessions).filter((item) => item.date >= weekStartKey).length;
+    const [todayAudioSession, morningAudioSession] = await Promise.all([
+      getSleepAudioSessionByDate(todayKey()),
+      morningCheckInDate ? getSleepAudioSessionByDate(morningCheckInDate) : Promise.resolve(null)
+    ]);
 
-    setData({ userConfig, session, morningCheckInDate, latestSleepRecord, stats, weeklyRitualCount });
+    setData({
+      userConfig,
+      session,
+      morningCheckInDate,
+      latestSleepRecord,
+      todayAudioSession,
+      morningAudioSession,
+      stats,
+      weeklyRitualCount
+    });
   }, []);
 
   useEffect(() => {
@@ -283,6 +313,7 @@ export default function HomeScreen() {
 
     if (viewModel.action.startsSession) {
       await startTodaySession();
+      await markRitualStarted();
       await loadHomeData();
     }
 
@@ -344,6 +375,19 @@ export default function HomeScreen() {
           disabled={viewModel.action.disabled}
           style={styles.heroButton}
         />
+        {viewModel.secondaryAction ? (
+          <AppButton
+            title={viewModel.secondaryAction.buttonTitle}
+            variant="secondary"
+            onPress={() => {
+              if (viewModel.secondaryAction?.href) {
+                router.push(viewModel.secondaryAction.href);
+              }
+            }}
+            style={styles.secondaryButton}
+            size="md"
+          />
+        ) : null}
       </AppCard>
 
       <View style={styles.goalRow}>
@@ -582,6 +626,10 @@ const styles = StyleSheet.create({
     width: 254,
     minHeight: 76,
     borderRadius: 38,
+    alignSelf: "flex-start"
+  },
+  secondaryButton: {
+    width: 254,
     alignSelf: "flex-start"
   },
   goalRow: {
