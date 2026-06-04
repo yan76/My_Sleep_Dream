@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
@@ -59,6 +59,9 @@ const PRIMARY_TOOLS = [
 ] as const;
 
 const recentChangeBackground = require("../assets/ui/recent-change-nightscape.png");
+const dreamIllustration = require("../assets/generated/sleep-generator-ui/assets/illustrations/illustration-sleep-generator-dream-01.png");
+const ritualCtaBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-home-ritual-cta-bg-254x76.png");
+const ritualPillBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-sleep-generator-top-pill-bg-clean.png");
 
 function isYesterday(dateKey: string): boolean {
   const yesterday = new Date();
@@ -350,31 +353,49 @@ export default function HomeScreen() {
         <Text style={styles.subtitle}>{viewModel.subtitle}</Text>
       </View>
 
-      <AppCard tone="warm" style={styles.heroCard}>
+      <View style={styles.heroCard}>
         <View style={styles.statusRow}>
           <Text style={styles.label}>当前最该做的一件事</Text>
-          <Text style={styles.statusPill}>{viewModel.statusLabel}</Text>
+          <ImageBackground
+            source={ritualPillBackground}
+            resizeMode="stretch"
+            style={styles.statusPill}
+            imageStyle={styles.statusPillImage}
+          >
+            <Text style={styles.statusPillText}>{viewModel.statusLabel}</Text>
+          </ImageBackground>
         </View>
         <View style={styles.heroBody}>
           <View style={styles.heroCopy}>
             <Text style={styles.actionTitle}>{viewModel.action.title}</Text>
             <Text style={styles.body}>{viewModel.action.description}</Text>
           </View>
-          <View style={styles.sleepLogo} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <View style={styles.logoGlow} />
-            <View style={styles.logoMoonBack} />
-            <View style={styles.logoMoon} />
-            <View style={styles.logoCloud} />
-            <Text style={styles.logoZ}>zZ</Text>
+          <View style={styles.dreamFrame} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <Image source={dreamIllustration} style={styles.dreamImage} resizeMode="stretch" />
           </View>
         </View>
-        <AppButton
-          title={viewModel.action.buttonTitle}
-          variant={viewModel.action.disabled ? "ghost" : "gradient"}
+        <Pressable
+          accessibilityRole="button"
           onPress={handlePrimaryAction}
           disabled={viewModel.action.disabled}
-          style={styles.heroButton}
-        />
+          renderToHardwareTextureAndroid={true}
+          style={({ pressed }) => [
+            styles.heroButton,
+            viewModel.action.disabled && styles.heroButtonDisabled,
+            pressed && !viewModel.action.disabled && styles.pressed
+          ]}
+        >
+          <ImageBackground
+            source={ritualCtaBackground}
+            resizeMode="stretch"
+            style={styles.heroButtonBg}
+            imageStyle={styles.heroButtonImage}
+          >
+            <Text style={[styles.heroButtonText, viewModel.action.disabled && styles.heroButtonTextDisabled]}>
+              {viewModel.action.buttonTitle}
+            </Text>
+          </ImageBackground>
+        </Pressable>
         {viewModel.secondaryAction ? (
           <AppButton
             title={viewModel.secondaryAction.buttonTitle}
@@ -388,7 +409,7 @@ export default function HomeScreen() {
             size="md"
           />
         ) : null}
-      </AppCard>
+      </View>
 
       <View style={styles.goalRow}>
         <View style={styles.mini}>
@@ -513,18 +534,25 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   heroCard: {
-    minHeight: 350,
-    borderRadius: 50,
+    minHeight: 326,
+    borderRadius: 42,
+    borderWidth: 1,
     borderColor: "#6D665F",
-    backgroundColor: "#2A2834"
+    backgroundColor: "#2A2834",
+    paddingHorizontal: 24,
+    paddingTop: 26,
+    paddingBottom: 28,
+    gap: 20,
+    overflow: "hidden"
   },
   heroBody: {
-    minHeight: 182,
+    minHeight: 150,
     justifyContent: "center",
-    paddingRight: 160
+    position: "relative"
   },
   heroCopy: {
-    gap: 14
+    width: 186,
+    gap: 12
   },
   statusRow: {
     flexDirection: "row",
@@ -538,19 +566,25 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   statusPill: {
+    width: 86,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden"
+  },
+  statusPillImage: {
+    borderRadius: 18
+  },
+  statusPillText: {
     color: colors.accent,
     fontSize: 12,
-    fontWeight: "900",
-    borderRadius: 999,
-    backgroundColor: "#39313A",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    overflow: "hidden"
+    lineHeight: 16,
+    fontWeight: "900"
   },
   actionTitle: {
     color: colors.ink,
-    fontSize: 40,
-    lineHeight: 45,
+    fontSize: 38,
+    lineHeight: 44,
     fontWeight: "900"
   },
   body: {
@@ -559,74 +593,51 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     fontWeight: "700"
   },
-  sleepLogo: {
+  dreamFrame: {
     position: "absolute",
-    right: 0,
-    bottom: -2,
-    width: 156,
-    height: 164,
-    borderRadius: 54,
+    right: -4,
+    top: -2,
+    width: 174,
+    height: 174,
+    borderRadius: 58,
     backgroundColor: "#242432",
     borderWidth: 1,
     borderColor: "#3D3B4D",
-    alignItems: "center",
-    justifyContent: "center",
     overflow: "hidden"
   },
-  logoGlow: {
+  dreamImage: {
     position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 32,
-    borderColor: "#2D2B3C",
-    right: -32,
-    top: -28
-  },
-  logoMoonBack: {
-    position: "absolute",
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: "#D8D2B8",
-    left: 76,
-    top: 62,
-    opacity: 0.78
-  },
-  logoMoon: {
-    position: "absolute",
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    backgroundColor: colors.accent,
-    left: 34,
-    top: 76
-  },
-  logoCloud: {
-    position: "absolute",
-    width: 106,
-    height: 48,
-    borderRadius: 30,
-    backgroundColor: "#9DB9A5",
-    borderWidth: 2,
-    borderColor: "#BDD2BA",
-    left: 44,
-    bottom: 42,
-    opacity: 0.72
-  },
-  logoZ: {
-    position: "absolute",
-    right: 30,
-    top: 58,
-    color: "#E7DDBF",
-    fontSize: 22,
-    fontWeight: "900"
+    left: -5,
+    top: -13,
+    width: 184,
+    height: 211
   },
   heroButton: {
     width: 254,
-    minHeight: 76,
+    height: 76,
     borderRadius: 38,
-    alignSelf: "flex-start"
+    alignSelf: "flex-start",
+    overflow: "hidden"
+  },
+  heroButtonBg: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  heroButtonImage: {
+    borderRadius: 38
+  },
+  heroButtonText: {
+    color: colors.buttonText,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "900"
+  },
+  heroButtonDisabled: {
+    opacity: 0.48
+  },
+  heroButtonTextDisabled: {
+    color: colors.ink
   },
   secondaryButton: {
     width: 254,
