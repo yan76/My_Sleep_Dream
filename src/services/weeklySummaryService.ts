@@ -53,6 +53,30 @@ function completedExecution(record: DailyExecutionRecord): boolean {
   return Boolean(record.readyToSleepAt || record.checkinCompletedAt || record.status === "checked_in");
 }
 
+function uniqueDates(dates: string[]): Set<string> {
+  return new Set(dates.filter(Boolean));
+}
+
+function countCompletedCycleDates(
+  executionRecords: DailyExecutionRecord[],
+  sleepRecords: SleepRecord[]
+): number {
+  return uniqueDates([
+    ...executionRecords.filter(completedExecution).map((record) => record.date),
+    ...sleepRecords.map((record) => record.date)
+  ]).size;
+}
+
+function countNearTargetDates(
+  executionRecords: DailyExecutionRecord[],
+  sleepRecords: SleepRecord[]
+): number {
+  return uniqueDates([
+    ...executionRecords.filter((record) => record.sleepResult === "near_target").map((record) => record.date),
+    ...sleepRecords.filter((record) => record.success).map((record) => record.date)
+  ]).size;
+}
+
 function createContent(result: WeeklySummaryResult): string {
   return [
     result.summary,
@@ -69,15 +93,13 @@ export function createLocalWeeklySummary(input: WeeklySummaryInput, safetyLabel?
   const weekExecutions = input.executionRecords.filter((record) => inLastSevenDays(record.date));
   const weekRecords = input.records.filter((record) => inLastSevenDays(record.date));
   const weekReviews = input.reviews.filter((review) => inLastSevenDays(review.date));
-  const completedCount = weekExecutions.filter(completedExecution).length || weekRecords.length;
-  const reviewCount = weekReviews.length;
+  const completedCount = countCompletedCycleDates(weekExecutions, weekRecords);
+  const reviewCount = uniqueDates(weekReviews.map((review) => review.date)).size;
   const pauseCount = weekExecutions.reduce(
     (sum, record) => sum + record.rescuePauseCount + record.shutdownChallengeCount,
     0
   );
-  const nearTargetCount =
-    weekExecutions.filter((record) => record.sleepResult === "near_target").length ||
-    weekRecords.filter((record) => record.success).length;
+  const nearTargetCount = countNearTargetDates(weekExecutions, weekRecords);
 
   const summary = applySafetyBoundary(
     completedCount > 0
@@ -119,6 +141,14 @@ async function persistWeeklySummary(result: WeeklySummaryResult): Promise<void> 
 export async function generateWeeklySummary(input: WeeklySummaryInput): Promise<WeeklySummaryResult> {
   const safetyLabel = getSafetyLabel(reviewCorpus(input.reviews));
   const fallback = createLocalWeeklySummary(input, safetyLabel);
+  const weekExecutions = input.executionRecords.filter((record) => inLastSevenDays(record.date));
+  const weekRecords = input.records.filter((record) => inLastSevenDays(record.date));
+  const weekReviews = input.reviews.filter((review) => inLastSevenDays(review.date));
+  const metrics = {
+    completedCycleDays: countCompletedCycleDates(weekExecutions, weekRecords),
+    reviewDays: uniqueDates(weekReviews.map((review) => review.date)).size,
+    nearTargetDays: countNearTargetDates(weekExecutions, weekRecords)
+  };
 
   if (safetyLabel === "crisis" || safetyLabel === "medical_boundary") {
     await persistWeeklySummary(fallback);
@@ -146,9 +176,10 @@ export async function generateWeeklySummary(input: WeeklySummaryInput): Promise<
     body: {
       targetSleepTime: input.config.targetSleepTime,
       wakeUpTime: input.config.wakeUpTime,
-      executionRecords: input.executionRecords.filter((record) => inLastSevenDays(record.date)),
-      sleepRecords: input.records.filter((record) => inLastSevenDays(record.date)),
-      reviews: input.reviews.filter((review) => inLastSevenDays(review.date))
+      metrics,
+      executionRecords: weekExecutions,
+      sleepRecords: weekRecords,
+      reviews: weekReviews
     }
   });
 

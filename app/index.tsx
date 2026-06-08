@@ -22,6 +22,7 @@ import {
   markNeedsCheckin,
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
+import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
 import { useAppStore } from "@/store/useAppStore";
 import { formatMinutes, minutesUntil, nowTime, todayKey } from "@/utils/date";
 import { useResponsiveMetrics } from "@/utils/responsive";
@@ -93,7 +94,8 @@ export default function HomeScreen() {
       return;
     }
 
-    const todayExecutionRecord = await getDailyExecutionRecordByDate(todayKey());
+    const cycleDate = await resolveCurrentCycleDate();
+    const todayExecutionRecord = await getDailyExecutionRecordByDate(cycleDate);
     const latestSleepExecutionRecord = latestSleepRecord
       ? await getDailyExecutionRecordByDate(latestSleepRecord.date)
       : null;
@@ -102,7 +104,7 @@ export default function HomeScreen() {
     const weekStartKey = todayKey(weekStart);
     const weeklyRitualCount = Object.values(sessions).filter((item) => item.date >= weekStartKey).length;
     const [todayAudioSession, morningAudioSession] = await Promise.all([
-      getSleepAudioSessionByDate(todayKey()),
+      getSleepAudioSessionByDate(cycleDate),
       morningCheckInDate ? getSleepAudioSessionByDate(morningCheckInDate) : Promise.resolve(null)
     ]);
 

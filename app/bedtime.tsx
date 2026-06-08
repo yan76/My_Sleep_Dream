@@ -1,8 +1,8 @@
 import { Asset } from "expo-asset";
 import { createAudioPlayer } from "expo-audio";
 import type { AudioPlayer } from "expo-audio";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
@@ -55,13 +55,7 @@ export default function BedtimeScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      playerRef.current?.remove();
-    };
-  }, []);
-
-  const stopCurrentPlayer = () => {
+  const stopCurrentPlayer = useCallback(() => {
     webAudioRef.current?.pause();
     if (webAudioRef.current) {
       webAudioRef.current.currentTime = 0;
@@ -71,7 +65,15 @@ export default function BedtimeScreen() {
     playerRef.current?.remove();
     playerRef.current = null;
     setIsPlaying(false);
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopCurrentPlayer();
+      };
+    }, [stopCurrentPlayer])
+  );
 
   const playOption = (option: SoundOption) => {
     if (Platform.OS === "web") {

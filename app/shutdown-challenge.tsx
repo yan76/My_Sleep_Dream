@@ -5,8 +5,14 @@ import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
-import { markDailyShutdownChallengeCompleted, markRescuePause } from "@/storage/dailyExecutionStorage";
-import { markShutdownChallengeCompleted } from "@/storage/rescueSessionStorage";
+import {
+  getDailyExecutionRecordByDate,
+  markDailyShutdownChallengeCompleted,
+  markRescuePause
+} from "@/storage/dailyExecutionStorage";
+import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
+import { getMorningCheckInDate, getTodaySession, markShutdownChallengeCompleted } from "@/storage/rescueSessionStorage";
+import { dailyCycleAtLeast } from "@/utils/dailyCycle";
 
 const TOTAL_SECONDS = 120;
 
@@ -21,6 +27,47 @@ function formatTimer(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+}
+
+type ChallengeCycleTarget = {
+  date: string;
+  returnHome: boolean;
+  updateTodaySession: boolean;
+};
+
+async function getChallengeCycleTarget(): Promise<ChallengeCycleTarget> {
+  const morningCheckInDate = await getMorningCheckInDate();
+
+  if (morningCheckInDate) {
+    return {
+      date: morningCheckInDate,
+      returnHome: true,
+      updateTodaySession: false
+    };
+  }
+
+  const date = await resolveCurrentCycleDate();
+  const [todayExecutionRecord, todaySession] = await Promise.all([
+    getDailyExecutionRecordByDate(date),
+    getTodaySession()
+  ]);
+
+  if (
+    dailyCycleAtLeast(todayExecutionRecord, "ready_to_sleep") ||
+    todaySession?.status === "ready_to_sleep"
+  ) {
+    return {
+      date,
+      returnHome: true,
+      updateTodaySession: false
+    };
+  }
+
+  return {
+    date,
+    returnHome: false,
+    updateTodaySession: true
+  };
 }
 
 export default function ShutdownChallengeScreen() {
@@ -52,9 +99,14 @@ export default function ShutdownChallengeScreen() {
 
     setSaving(true);
     try {
-      await markShutdownChallengeCompleted();
-      await markDailyShutdownChallengeCompleted();
-      router.replace("/rescue");
+      const target = await getChallengeCycleTarget();
+
+      if (target.updateTodaySession) {
+        await markShutdownChallengeCompleted();
+      }
+
+      await markDailyShutdownChallengeCompleted(target.date);
+      router.replace(target.returnHome ? "/" : "/rescue");
     } finally {
       setSaving(false);
     }
@@ -67,8 +119,10 @@ export default function ShutdownChallengeScreen() {
 
     setSaving(true);
     try {
-      await markRescuePause();
-      router.replace("/rescue");
+      const target = await getChallengeCycleTarget();
+
+      await markRescuePause(target.date);
+      router.replace(target.returnHome ? "/" : "/rescue");
     } finally {
       setSaving(false);
     }

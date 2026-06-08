@@ -9,7 +9,9 @@ import { colors } from "@/constants/colors";
 import { lateNightReasons } from "@/constants/reasons";
 import {
   createOrUpdateSleepRecord,
-  getMorningCheckInDate
+  getMorningCheckInDate,
+  getSleepRecordByDate,
+  getUserConfig
 } from "@/storage/rescueSessionStorage";
 import {
   classifySleepResult,
@@ -50,14 +52,17 @@ export default function CheckinScreen() {
 
   const load = useCallback(async () => {
     const checkinDate = requestedDate ?? (await getMorningCheckInDate()) ?? todayKey(addDays(new Date(), -1));
-    const [executionRecord, audio] = await Promise.all([
+    const [executionRecord, sleepRecord, userConfig, audio] = await Promise.all([
       getDailyExecutionRecordByDate(checkinDate),
+      getSleepRecordByDate(checkinDate),
+      getUserConfig(),
       getSleepAudioSessionByDate(checkinDate)
     ]);
+    const plannedTime = executionRecord?.plannedSleepTime ?? sleepRecord?.plannedSleepTime ?? userConfig.targetSleepTime;
 
     setDate(checkinDate);
-    setPlannedSleepTime(executionRecord?.plannedSleepTime ?? "23:30");
-    setActualSleepTime(executionRecord?.actualSleepTime ?? executionRecord?.plannedSleepTime ?? "23:30");
+    setPlannedSleepTime(plannedTime);
+    setActualSleepTime(executionRecord?.actualSleepTime ?? sleepRecord?.actualSleepTime ?? plannedTime);
     setMorningMood(executionRecord?.morningMood ?? "okay");
     setLateReason(executionRecord?.lateReason);
     setAudioSession(audio);
@@ -102,6 +107,7 @@ export default function CheckinScreen() {
       });
       await createOrUpdateSleepRecord({
         date,
+        plannedSleepTime,
         actualSleepTime,
         moodNextMorning: moodLabelMap[morningMood],
         reasonIfFailed: lateReason

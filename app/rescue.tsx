@@ -22,9 +22,17 @@ import {
   markRescuePause,
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
+import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
 import { dailyCycleAtLeast } from "@/utils/dailyCycle";
-import { todayKey } from "@/utils/date";
 import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
+
+function isTerminalDailyCycle(record: RescueData["executionRecord"]): boolean {
+  return record?.status === "checked_in" || record?.status === "feedback_viewed";
+}
+
+function isInactiveSession(session: RescueData["session"]): boolean {
+  return Boolean(session && ["completed", "abandoned"].includes(session.status));
+}
 
 function StepCard({ step, index }: { step: FlowStep; index: number }) {
   const isDone = step.state === "done";
@@ -53,9 +61,10 @@ export default function RescueScreen() {
   const [showExternalCloseDialog, setShowExternalCloseDialog] = useState(false);
 
   const loadData = useCallback(async () => {
+    const cycleDate = await resolveCurrentCycleDate();
     const [session, executionRecord, userConfig] = await Promise.all([
       getTodaySession(),
-      getDailyExecutionRecordByDate(todayKey()),
+      getDailyExecutionRecordByDate(cycleDate),
       getUserConfig()
     ]);
     setData({ session, executionRecord, userConfig });
@@ -83,8 +92,10 @@ export default function RescueScreen() {
 
     setIsWorking(true);
     try {
-      const session = data?.session ?? null;
-      const executionRecord = data?.executionRecord ?? null;
+      const rawSession = data?.session ?? null;
+      const rawExecutionRecord = data?.executionRecord ?? null;
+      const session = isInactiveSession(rawSession) ? null : rawSession;
+      const executionRecord = isTerminalDailyCycle(rawExecutionRecord) ? null : rawExecutionRecord;
 
       if (dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep") {
         router.push("/");
@@ -156,10 +167,19 @@ export default function RescueScreen() {
 
     setIsWorking(true);
     try {
-      await startTodaySession();
-      await markRitualStarted();
-      await markRescuePause();
-      await markUrgeToScroll();
+      const rawSession = data?.session ?? null;
+      const rawExecutionRecord = data?.executionRecord ?? null;
+      const session = isInactiveSession(rawSession) ? null : rawSession;
+      const executionRecord = isTerminalDailyCycle(rawExecutionRecord) ? null : rawExecutionRecord;
+      const alreadyReadyToSleep = dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep";
+
+      if (!alreadyReadyToSleep) {
+        await startTodaySession();
+        await markRitualStarted();
+        await markRescuePause();
+        await markUrgeToScroll();
+      }
+
       router.push("/shutdown-challenge");
     } finally {
       setIsWorking(false);

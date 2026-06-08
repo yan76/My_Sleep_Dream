@@ -15,6 +15,7 @@ import {
 } from "@/storage/sqlite/dailyCycleRepository";
 import { enqueueSyncItem } from "@/storage/sqlite/syncQueueRepository";
 import { storageKeys } from "@/storage/storageKeys";
+import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
 import { getUserConfig } from "@/storage/rescueSessionStorage";
 import {
   DailyExecutionRecord,
@@ -23,7 +24,6 @@ import {
   MorningMood,
   SleepAidPreference
 } from "@/types/app";
-import { todayKey } from "@/utils/date";
 
 type StoredDailyExecutionRecords = Record<string, DailyExecutionRecord>;
 
@@ -43,6 +43,10 @@ type CheckinInput = {
 const nowIso = () => new Date().toISOString();
 
 let legacyDailyCycleMigrationChecked = false;
+
+function isTerminalDailyCycleStatus(status: DailyExecutionStatus): boolean {
+  return status === "checked_in" || status === "feedback_viewed";
+}
 
 async function readLegacyExecutionMap(): Promise<StoredDailyExecutionRecords> {
   try {
@@ -141,6 +145,10 @@ async function updateExecutionRecord(
   return persistExecutionRecord(updated);
 }
 
+async function resolveExecutionDate(date?: string): Promise<string> {
+  return date ?? resolveCurrentCycleDate();
+}
+
 export async function getDailyExecutionRecords(): Promise<DailyExecutionRecord[]> {
   const records = await readExecutionMap();
   return Object.values(records)
@@ -152,38 +160,48 @@ export async function getDailyExecutionRecordByDate(date: string): Promise<Daily
   return readExecutionRecord(date);
 }
 
-export async function ensureDailyExecutionRecord(date = todayKey()): Promise<DailyExecutionRecord> {
-  const current = await readExecutionRecord(date);
+export async function ensureDailyExecutionRecord(date?: string): Promise<DailyExecutionRecord> {
+  const targetDate = await resolveExecutionDate(date);
+  const current = await readExecutionRecord(targetDate);
 
   if (current) {
     return current;
   }
 
-  const next = await createDefaultRecord(date);
+  const next = await createDefaultRecord(targetDate);
   return persistExecutionRecord(next, { enqueueSync: false, syncStatus: "local_only" });
 }
 
-export async function markRitualStarted(date = todayKey()): Promise<DailyExecutionRecord> {
-  const record = await updateExecutionRecord(date, { ritualStartedAt: nowIso() }, "ritual_started");
-  trackAppEvent("rescue_started", { date }).catch(() => undefined);
+export async function markRitualStarted(date?: string): Promise<DailyExecutionRecord> {
+  const targetDate = await resolveExecutionDate(date);
+  const current = await readExecutionRecord(targetDate);
+  const startedAt = nowIso();
+  const record = isTerminalDailyCycleStatus(current?.status ?? "not_started")
+    ? await persistExecutionRecord(
+        applyDailyCycleUpdate(await createDefaultRecord(targetDate), { ritualStartedAt: startedAt }, "ritual_started", startedAt)
+      )
+    : await updateExecutionRecord(targetDate, { ritualStartedAt: startedAt }, "ritual_started");
+  trackAppEvent("rescue_started", { date: targetDate }).catch(() => undefined);
   return record;
 }
 
-export async function markExternalClosed(date = todayKey()): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(date, { externalClosedAt: nowIso() }, "external_closed");
+export async function markExternalClosed(date?: string): Promise<DailyExecutionRecord> {
+  return updateExecutionRecord(await resolveExecutionDate(date), { externalClosedAt: nowIso() }, "external_closed");
 }
 
-export async function markReviewCompleted(date = todayKey()): Promise<DailyExecutionRecord> {
-  const record = await updateExecutionRecord(date, { reviewCompletedAt: nowIso() }, "review_completed");
-  trackAppEvent("today_review_completed", { date }).catch(() => undefined);
+export async function markReviewCompleted(date?: string): Promise<DailyExecutionRecord> {
+  const targetDate = await resolveExecutionDate(date);
+  const record = await updateExecutionRecord(targetDate, { reviewCompletedAt: nowIso() }, "review_completed");
+  trackAppEvent("today_review_completed", { date: targetDate }).catch(() => undefined);
   return record;
 }
 
-export async function markSleepAidStarted(input: SleepAidInput = {}, date = todayKey()): Promise<DailyExecutionRecord> {
-  const current = await ensureDailyExecutionRecord(date);
+export async function markSleepAidStarted(input: SleepAidInput = {}, date?: string): Promise<DailyExecutionRecord> {
+  const targetDate = await resolveExecutionDate(date);
+  const current = await ensureDailyExecutionRecord(targetDate);
   const aid = input.aid;
   const record = await updateExecutionRecord(
-    date,
+    targetDate,
     {
       sleepAidStartedAt: nowIso(),
       usedSoundSpa: current.usedSoundSpa || aid === "sound_spa" || aid === "white_noise" || aid === "asmr",
@@ -192,42 +210,44 @@ export async function markSleepAidStarted(input: SleepAidInput = {}, date = toda
     },
     "sleep_aid_started"
   );
-  trackAppEvent("sleep_aid_used", { date, aid: typeof aid === "string" ? aid : "unknown" }).catch(() => undefined);
+  trackAppEvent("sleep_aid_used", { date: targetDate, aid: typeof aid === "string" ? aid : "unknown" }).catch(() => undefined);
   return record;
 }
 
-export async function markReadyToSleep(date = todayKey()): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(date, { readyToSleepAt: nowIso() }, "ready_to_sleep");
+export async function markReadyToSleep(date?: string): Promise<DailyExecutionRecord> {
+  return updateExecutionRecord(await resolveExecutionDate(date), { readyToSleepAt: nowIso() }, "ready_to_sleep");
 }
 
 export async function markNeedsCheckin(date: string): Promise<DailyExecutionRecord> {
   return updateExecutionRecord(date, {}, "needs_checkin");
 }
 
-export async function markSleepAudioEnabled(sessionId: string, date = todayKey()): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(date, { sleepAudioEnabled: true, sleepAudioSessionId: sessionId });
+export async function markSleepAudioEnabled(sessionId: string, date?: string): Promise<DailyExecutionRecord> {
+  return updateExecutionRecord(await resolveExecutionDate(date), { sleepAudioEnabled: true, sleepAudioSessionId: sessionId });
 }
 
-export async function markSleepAudioDeleted(date = todayKey()): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(date, { sleepAudioEnabled: false, sleepAudioSessionId: undefined });
+export async function markSleepAudioDeleted(date?: string): Promise<DailyExecutionRecord> {
+  return updateExecutionRecord(await resolveExecutionDate(date), { sleepAudioEnabled: false, sleepAudioSessionId: undefined });
 }
 
-export async function markRescuePause(date = todayKey()): Promise<DailyExecutionRecord> {
-  const current = await ensureDailyExecutionRecord(date);
-  return updateExecutionRecord(date, { rescuePauseCount: current.rescuePauseCount + 1 }, "ritual_started");
+export async function markRescuePause(date?: string): Promise<DailyExecutionRecord> {
+  const targetDate = await resolveExecutionDate(date);
+  const current = await ensureDailyExecutionRecord(targetDate);
+  return updateExecutionRecord(targetDate, { rescuePauseCount: current.rescuePauseCount + 1 }, "ritual_started");
 }
 
-export async function markDailyShutdownChallengeCompleted(date = todayKey()): Promise<DailyExecutionRecord> {
-  const current = await ensureDailyExecutionRecord(date);
+export async function markDailyShutdownChallengeCompleted(date?: string): Promise<DailyExecutionRecord> {
+  const targetDate = await resolveExecutionDate(date);
+  const current = await ensureDailyExecutionRecord(targetDate);
   return updateExecutionRecord(
-    date,
+    targetDate,
     { shutdownChallengeCount: current.shutdownChallengeCount + 1 },
     "ritual_started"
   );
 }
 
 export async function completeMorningCheckin(input: CheckinInput = {}): Promise<DailyExecutionRecord> {
-  const date = input.date ?? todayKey();
+  const date = await resolveExecutionDate(input.date);
   const current = await ensureDailyExecutionRecord(date);
   const actualSleepTime = input.actualSleepTime?.trim();
 

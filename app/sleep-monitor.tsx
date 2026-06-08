@@ -13,6 +13,7 @@ import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { markSleepAudioDeleted, markSleepAudioEnabled } from "@/storage/dailyExecutionStorage";
+import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
 import {
   createSleepAudioSession,
   deleteSleepAudioSession,
@@ -25,19 +26,20 @@ import {
   requestSleepAudioPermission
 } from "@/services/sleepAudioRecorder";
 import { SleepAudioSession } from "@/types/app";
-import { todayKey } from "@/utils/date";
 
 export default function SleepMonitorScreen() {
-  const date = todayKey();
   const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
+  const [date, setDate] = useState<string | null>(null);
   const [session, setSession] = useState<SleepAudioSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
 
   const loadSession = useCallback(async () => {
-    setSession(await getSleepAudioSessionByDate(date));
-  }, [date]);
+    const cycleDate = await resolveCurrentCycleDate();
+    setDate(cycleDate);
+    setSession(await getSleepAudioSessionByDate(cycleDate));
+  }, []);
 
   useEffect(() => {
     loadSession();
@@ -48,12 +50,13 @@ export default function SleepMonitorScreen() {
       return;
     }
 
+    const cycleDate = date ?? (await resolveCurrentCycleDate());
     setBusy(true);
     try {
       setRecordingError(null);
       const permission = await requestSleepAudioPermission();
       if (permission !== "granted") {
-        setSession(await markSleepAudioPermissionDenied(date));
+        setSession(await markSleepAudioPermissionDenied(cycleDate));
         return;
       }
 
@@ -65,16 +68,16 @@ export default function SleepMonitorScreen() {
       });
       await recorder.prepareToRecordAsync();
       recorder.record();
-      const next = await createSleepAudioSession(date, {
+      const next = await createSleepAudioSession(cycleDate, {
         localAudioUri: recorder.uri ?? recorderState.url ?? undefined
       });
-      await markSleepAudioEnabled(next.id, date);
+      await markSleepAudioEnabled(next.id, cycleDate);
       setSession(next);
     } catch (error) {
       console.warn("[sleep-audio] Failed to start recorder", error);
       await setIsAudioActiveAsync(false).catch(() => undefined);
       setRecordingError("录音启动失败，请确认没有其他应用占用麦克风后再试。");
-      const failed = await updateSleepAudioSessionStatus(date, "failed", {
+      const failed = await updateSleepAudioSessionStatus(cycleDate, "failed", {
         localAudioUri: recorder.uri ?? recorderState.url ?? undefined
       }).catch(() => null);
       if (failed) {
@@ -90,12 +93,13 @@ export default function SleepMonitorScreen() {
       return;
     }
 
+    const cycleDate = date ?? (await resolveCurrentCycleDate());
     setBusy(true);
     try {
       setRecordingError(null);
       if (!recorderState.isRecording) {
         await setIsAudioActiveAsync(false).catch(() => undefined);
-        setSession(await updateSleepAudioSessionStatus(date, "completed", {
+        setSession(await updateSleepAudioSessionStatus(cycleDate, "completed", {
           localAudioUri: session?.localAudioUri
         }));
         return;
@@ -105,7 +109,7 @@ export default function SleepMonitorScreen() {
       await recorder.stop();
       const status = recorder.getStatus();
       await setIsAudioActiveAsync(false).catch(() => undefined);
-      setSession(await updateSleepAudioSessionStatus(date, "completed", {
+      setSession(await updateSleepAudioSessionStatus(cycleDate, "completed", {
         localAudioUri: recorder.uri ?? status.url ?? session?.localAudioUri,
         summary: startedDuration || status.durationMillis
           ? { quietScore: 92, hasVoiceLikeSound: false, hasSnoreLikeSound: false }
@@ -115,7 +119,7 @@ export default function SleepMonitorScreen() {
       console.warn("[sleep-audio] Failed to stop recorder", error);
       await setIsAudioActiveAsync(false).catch(() => undefined);
       setRecordingError("停止录音失败，你可以删除今晚监听记录后重新开始。");
-      const failed = await updateSleepAudioSessionStatus(date, "failed", {
+      const failed = await updateSleepAudioSessionStatus(cycleDate, "failed", {
         localAudioUri: recorder.uri ?? recorderState.url ?? session?.localAudioUri
       }).catch(() => null);
       if (failed) {
@@ -131,6 +135,7 @@ export default function SleepMonitorScreen() {
       return;
     }
 
+    const cycleDate = date ?? (await resolveCurrentCycleDate());
     setBusy(true);
     try {
       setRecordingError(null);
@@ -139,8 +144,8 @@ export default function SleepMonitorScreen() {
         await setIsAudioActiveAsync(false).catch(() => undefined);
       }
       await deleteSleepAudioRecording(session?.localAudioUri);
-      await deleteSleepAudioSession(date);
-      await markSleepAudioDeleted(date);
+      await deleteSleepAudioSession(cycleDate);
+      await markSleepAudioDeleted(cycleDate);
       setSession(null);
     } catch (error) {
       console.warn("[sleep-audio] Failed to delete recording", error);

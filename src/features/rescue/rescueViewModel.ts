@@ -29,6 +29,14 @@ export type RescueViewModel = {
   steps: FlowStep[];
 };
 
+function isTerminalDailyCycle(record: DailyExecutionRecord | null): boolean {
+  return record?.status === "checked_in" || record?.status === "feedback_viewed";
+}
+
+function isInactiveSession(session: RescueSession | null): boolean {
+  return Boolean(session && ["completed", "abandoned"].includes(session.status));
+}
+
 function getStepState(
   id: FlowStepId,
   session: RescueSession | null,
@@ -64,6 +72,14 @@ export function buildRescueViewModel(
   executionRecord: DailyExecutionRecord | null,
   userConfig?: UserConfig
 ): RescueViewModel {
+  if (isInactiveSession(session)) {
+    session = null;
+  }
+
+  if (isTerminalDailyCycle(executionRecord)) {
+    executionRecord = null;
+  }
+
   const rescueHint = getReasonBasedRescueHint(userConfig?.lateNightReasons ?? []);
   const steps: FlowStep[] = [
     {

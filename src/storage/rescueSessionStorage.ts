@@ -1,6 +1,12 @@
 import { appStorage } from "@/storage/appStorage";
+import { isDemoMode } from "@/constants/demo";
 import { storageKeys } from "@/storage/storageKeys";
 import { defaultSleepAidPreferences } from "@/constants/sleepAidPreferences";
+import {
+  clearStoredDemoCycleDate,
+  resolveCurrentCycleDate,
+  resolveDemoStartCycleDate
+} from "@/storage/demoCycleDateStorage";
 import { clearSleepAudioSessions } from "@/storage/sleepAudioStorage";
 import {
   clearDailyCyclesFromSQLite,
@@ -51,6 +57,10 @@ const sessionIdForDate = (date: string) => `rescue-session:${date}`;
 const sleepRecordIdForDate = (date: string) => `sleep-record:${date}`;
 const todayReviewIdForDate = (date: string) => `today-review:${date}`;
 const DEFAULT_CLOSING_NOTE = "今天已经结束，剩下的交给明天。";
+
+function isInactiveSession(session: RescueSession | undefined): boolean {
+  return Boolean(session && ["completed", "abandoned"].includes(session.status));
+}
 
 function createDefaultUserConfig(): UserConfig {
   const now = nowIso();
@@ -166,6 +176,22 @@ function dateTimeForDateKey(date: string, time: string): Date {
   const next = new Date(`${date}T00:00:00`);
   next.setHours(hours, minutes, 0, 0);
   return next;
+}
+
+function wakeTimeForCycle(date: string, wakeUpTime: string, readyAtValue?: string): Date {
+  const readyAt = readyAtValue ? new Date(readyAtValue) : null;
+
+  if (readyAt && !Number.isNaN(readyAt.getTime())) {
+    let wakeAt = dateTimeForDateKey(todayKey(readyAt), wakeUpTime);
+
+    if (wakeAt.getTime() <= readyAt.getTime()) {
+      wakeAt = dateTimeForDateKey(todayKey(addDays(wakeAt, 1)), wakeUpTime);
+    }
+
+    return wakeAt;
+  }
+
+  return dateTimeForDateKey(todayKey(addDays(new Date(`${date}T00:00:00`), 1)), wakeUpTime);
 }
 
 async function getDailyExecutionRecordMap(): Promise<StoredDailyExecutionRecords> {
@@ -294,16 +320,23 @@ export async function getRescueSessions(): Promise<StoredRescueSessions> {
 
 export async function getTodaySession(): Promise<RescueSession | null> {
   const sessions = await getRescueSessions();
-  return sessions[todayKey()] ?? null;
+  const date = await resolveCurrentCycleDate();
+  const session = sessions[date];
+  return session && !isInactiveSession(session) ? session : null;
 }
 
 export async function startTodaySession(): Promise<RescueSession> {
-  const date = todayKey();
   const sessions = await getRescueSessions();
+  const executionRecords = await getDailyExecutionRecordMap();
+  const date = await resolveDemoStartCycleDate({ sessions, executionRecords });
   const current = sessions[date];
 
-  if (current) {
+  if (current && !isInactiveSession(current)) {
     return current;
+  }
+
+  if (isInactiveSession(current)) {
+    await clearTodayReviewForDate(date);
   }
 
   const session: RescueSession = {
@@ -321,15 +354,16 @@ export async function startTodaySession(): Promise<RescueSession> {
 }
 
 export async function updateTodaySession(input: Partial<RescueSession>): Promise<RescueSession> {
-  const date = todayKey();
+  const date = await resolveCurrentCycleDate();
   const sessions = await getRescueSessions();
-  const current = sessions[date] ?? (await startTodaySession());
+  const stored = sessions[date];
+  const current = stored && !isInactiveSession(stored) ? stored : await startTodaySession();
   const next: RescueSession = {
     ...current,
     ...input
   };
 
-  await writeJson(storageKeys.rescueSessions, { ...sessions, [date]: next });
+  await writeJson(storageKeys.rescueSessions, { ...sessions, [next.date]: next });
   return next;
 }
 
@@ -355,13 +389,20 @@ export async function updateTodaySessionStatus(status: RescueSessionStatus): Pro
 }
 
 export async function markUrgeToScroll(): Promise<RescueSession> {
-  return updateTodaySession({ hasUrgeToScroll: true, status: "in_shutdown_challenge" });
+  const current = await getTodaySession();
+
+  return updateTodaySession({
+    hasUrgeToScroll: true,
+    status: current?.status === "ready_to_sleep" ? "ready_to_sleep" : "in_shutdown_challenge"
+  });
 }
 
 export async function markShutdownChallengeCompleted(): Promise<RescueSession> {
+  const current = await getTodaySession();
+
   return updateTodaySession({
     shutdownChallengeCompleted: true,
-    status: "in_rescue_flow"
+    status: current?.status === "ready_to_sleep" ? "ready_to_sleep" : "in_rescue_flow"
   });
 }
 
@@ -413,9 +454,22 @@ async function getTodayReviewMap(): Promise<StoredTodayReviews> {
   return readJson<StoredTodayReviews>(storageKeys.todayReviews, {});
 }
 
+async function clearTodayReviewForDate(date: string): Promise<void> {
+  const reviews = await getTodayReviewMap();
+  if (!reviews[date]) {
+    return;
+  }
+
+  const nextReviews = { ...reviews };
+  delete nextReviews[date];
+  await writeJson(storageKeys.todayReviews, nextReviews);
+  await replaceTodayReviewsInSQLite(Object.values(nextReviews));
+}
+
 export async function getTodayReview(): Promise<TodayReview | null> {
   const reviews = await getTodayReviewMap();
-  return reviews[todayKey()] ?? null;
+  const date = await resolveCurrentCycleDate();
+  return reviews[date] ?? null;
 }
 
 export async function getTodayReviews(): Promise<TodayReview[]> {
@@ -424,9 +478,9 @@ export async function getTodayReviews(): Promise<TodayReview[]> {
 }
 
 export async function saveTodayReview(input: TodayReviewInput): Promise<TodayReview> {
-  const date = todayKey();
   const reviews = await getTodayReviewMap();
   const session = await startTodaySession();
+  const date = session.date;
   const current = reviews[date];
   const now = nowIso();
   const review: TodayReview = {
@@ -534,7 +588,7 @@ export async function createOrUpdateSleepRecord(input: SleepRecordInput = {}): P
     console.warn("[sync] Failed to enqueue sleep record", error);
   });
 
-  if (session && success && session.status !== "completed") {
+  if (session && session.status !== "completed") {
     await writeJson(storageKeys.rescueSessions, {
       ...sessions,
       [date]: { ...session, status: "completed", completedAt: session.completedAt ?? now }
@@ -667,8 +721,11 @@ export async function getMorningCheckInDate(): Promise<string | null> {
         return false;
       }
 
-      const wakeDate = todayKey(addDays(new Date(`${record.date}T00:00:00`), 1));
-      const wakeAt = dateTimeForDateKey(wakeDate, record.wakeUpTime);
+      if (isDemoMode) {
+        return true;
+      }
+
+      const wakeAt = wakeTimeForCycle(record.date, record.wakeUpTime, record.readyToSleepAt);
       const elapsed = nowTime - wakeAt.getTime();
       return elapsed >= 0 && elapsed <= backfillWindowMs;
     })
@@ -684,8 +741,11 @@ export async function getMorningCheckInDate(): Promise<string | null> {
         return false;
       }
 
-      const wakeDate = todayKey(addDays(new Date(`${session.date}T00:00:00`), 1));
-      const wakeAt = dateTimeForDateKey(wakeDate, DEFAULT_WAKE_UP_TIME);
+      if (isDemoMode) {
+        return true;
+      }
+
+      const wakeAt = wakeTimeForCycle(session.date, DEFAULT_WAKE_UP_TIME, session.readyToSleepAt ?? session.completedAt);
       const elapsed = nowTime - wakeAt.getTime();
       return elapsed >= 0 && elapsed <= backfillWindowMs;
     })
@@ -700,7 +760,8 @@ export async function hasTodaySessionStarted(): Promise<boolean> {
 
 export async function hasTodayCheckedIn(): Promise<boolean> {
   const records = await getSleepRecordMap();
-  return Boolean(records[todayKey()]);
+  const date = await resolveCurrentCycleDate();
+  return Boolean(records[date]);
 }
 
 export async function shouldShowMorningCheckIn(): Promise<boolean> {
@@ -749,6 +810,7 @@ export async function clearRescueStorage(): Promise<void> {
     appStorage.removeItem(storageKeys.todayReviews),
     appStorage.removeItem(storageKeys.sleepRecords),
     appStorage.removeItem(storageKeys.dailyExecutionRecords),
+    clearStoredDemoCycleDate(),
     clearSleepAudioSessions(),
     clearSleepRecordsFromSQLite(),
     clearTodayReviewsFromSQLite(),

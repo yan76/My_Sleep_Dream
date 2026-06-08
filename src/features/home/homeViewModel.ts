@@ -44,6 +44,14 @@ export const PRIMARY_TOOLS = [
   { title: "下线挑战", href: "/shutdown-challenge", tone: "warm", icon: "2" }
 ] as const;
 
+function isTerminalDailyCycle(record: DailyExecutionRecord | null): boolean {
+  return record?.status === "checked_in" || record?.status === "feedback_viewed";
+}
+
+function isActiveSession(session: RescueSession | null): boolean {
+  return Boolean(session && !["completed", "abandoned"].includes(session.status));
+}
+
 function isYesterday(dateKey: string): boolean {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -87,6 +95,17 @@ function buildRecentChange(data: Pick<HomeData, "stats" | "weeklyRitualCount">):
   };
 }
 
+function buildSleepMonitorAction(audioSession?: SleepAudioSession | null): HomeAction {
+  const audioStarted = audioSession?.status === "recording";
+
+  return {
+    title: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
+    description: "只在本机记录声音摘要，不上传云端；不开启也不影响次日打卡。",
+    buttonTitle: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
+    href: "/sleep-monitor"
+  };
+}
+
 export function buildHomeState(data: HomeData): HomeViewModel {
   const {
     userConfig,
@@ -98,6 +117,8 @@ export function buildHomeState(data: HomeData): HomeViewModel {
     todayAudioSession,
     morningAudioSession
   } = data;
+  const activeTodayExecutionRecord = isTerminalDailyCycle(todayExecutionRecord) ? null : todayExecutionRecord;
+  const activeSession = isActiveSession(session) ? session : null;
   const recentChange = buildRecentChange(data);
   const currentHour = new Date().getHours();
   const hasFreshFeedback =
@@ -109,15 +130,17 @@ export function buildHomeState(data: HomeData): HomeViewModel {
   const countdownMinutes = minutesUntil(userConfig.targetSleepTime);
   const reminderMinutes = userConfig.reminderMinutesBefore;
   const isInBedtimeWindow = countdownMinutes <= reminderMinutes;
-  const hasStartedCycle = Boolean(session) || dailyCycleAtLeast(todayExecutionRecord, "ritual_started");
-  const hasClosedExternal = dailyCycleAtLeast(todayExecutionRecord, "external_closed");
+  const hasStartedCycle = Boolean(activeSession) || dailyCycleAtLeast(activeTodayExecutionRecord, "ritual_started");
+  const hasClosedExternal = dailyCycleAtLeast(activeTodayExecutionRecord, "external_closed");
   const hasCompletedReview =
-    dailyCycleAtLeast(todayExecutionRecord, "review_completed") || Boolean(session?.todayReviewCompleted);
+    dailyCycleAtLeast(activeTodayExecutionRecord, "review_completed") || Boolean(activeSession?.todayReviewCompleted);
   const hasStartedSleepAid =
-    dailyCycleAtLeast(todayExecutionRecord, "sleep_aid_started") ||
-    Boolean(session?.status === "in_relax_mode" || session?.relaxModeUsed || session?.sleepGeneratorUsed);
+    dailyCycleAtLeast(activeTodayExecutionRecord, "sleep_aid_started") ||
+    Boolean(activeSession?.status === "in_relax_mode" || activeSession?.relaxModeUsed || activeSession?.sleepGeneratorUsed);
   const isReadyToSleep =
-    dailyCycleAtLeast(todayExecutionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep";
+    activeTodayExecutionRecord?.status === "ready_to_sleep" ||
+    activeTodayExecutionRecord?.status === "needs_checkin" ||
+    activeSession?.status === "ready_to_sleep";
 
   if (morningCheckInDate) {
     const audioHint = morningAudioSession?.status
@@ -134,19 +157,19 @@ export function buildHomeState(data: HomeData): HomeViewModel {
         buttonTitle: "开始次日打卡",
         href: "/checkin"
       },
+      secondaryAction: isDemoMode && isReadyToSleep ? buildSleepMonitorAction(todayAudioSession ?? morningAudioSession) : undefined,
       ...recentChange
     };
   }
 
   if (isReadyToSleep) {
-    const audioStarted = todayAudioSession?.status === "recording";
     const demoAction: HomeAction = isDemoMode
       ? {
           title: "体验次日打卡",
           description: "Demo 模式可以直接进入次日打卡，不用等到明早。打卡后会生成昨晚反馈，并计入成长记录。",
           buttonTitle: "体验次日打卡",
-          href: { pathname: "/checkin", params: { date: todayExecutionRecord?.date ?? session?.date ?? todayKey(), demo: "1" } },
-          demoCheckinDate: todayExecutionRecord?.date ?? session?.date ?? todayKey()
+          href: { pathname: "/checkin", params: { date: activeTodayExecutionRecord?.date ?? activeSession?.date ?? todayKey(), demo: "1" } },
+          demoCheckinDate: activeTodayExecutionRecord?.date ?? activeSession?.date ?? todayKey()
         }
       : {
           title: "明早再来补一笔",
@@ -160,12 +183,7 @@ export function buildHomeState(data: HomeData): HomeViewModel {
       subtitle: "接下来不用再证明什么，睡觉就是今晚最后一步。",
       statusLabel: isDemoMode ? "Demo 快进" : "等待明早补录",
       action: demoAction,
-      secondaryAction: {
-        title: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
-        description: "只在本机记录声音摘要，不上传云端；不开启也不影响次日打卡。",
-        buttonTitle: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
-        href: "/sleep-monitor"
-      },
+      secondaryAction: buildSleepMonitorAction(todayAudioSession),
       ...recentChange
     };
   }
@@ -233,7 +251,7 @@ export function buildHomeState(data: HomeData): HomeViewModel {
     };
   }
 
-  if (hasClosedExternal || (session?.ritualStep ?? 0) >= 1 || session?.status === "in_rescue_flow") {
+  if (hasClosedExternal || (activeSession?.ritualStep ?? 0) >= 1 || activeSession?.status === "in_rescue_flow") {
     return {
       title: "把今天放在这里",
       subtitle: "写一句就好，不用漂亮，也不用完整。",

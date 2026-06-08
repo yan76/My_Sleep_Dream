@@ -8,6 +8,7 @@ export const storageKeys = {
   sleepAudioSessions: "my-sleep-dream:sleep-audio-sessions",
   aiGeneratedOutputs: "my-sleep-dream:ai-generated-outputs",
   sqliteMigrationVersion: "my-sleep-dream:sqlite-migration-version",
+  demoActiveCycleDate: "my-sleep-dream:demo-active-cycle-date",
   localReminderNotificationId: "my-sleep-dream:local-reminder-notification-id",
   localReminderSnapshot: "my-sleep-dream:local-reminder-snapshot",
   appEvents: "my-sleep-dream:app-events"
