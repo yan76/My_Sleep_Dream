@@ -5,6 +5,8 @@ import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
+import { buildHomeState, PRIMARY_TOOLS } from "@/features/home/homeViewModel";
+import type { HomeData } from "@/features/home/homeViewModel";
 import {
   getAppStats,
   getLatestSleepRecord,
@@ -15,242 +17,63 @@ import {
   startTodaySession
 } from "@/storage/rescueSessionStorage";
 import { getSleepAudioSessionByDate } from "@/storage/sleepAudioStorage";
-import { markRitualStarted } from "@/storage/dailyExecutionStorage";
+import {
+  getDailyExecutionRecordByDate,
+  markNeedsCheckin,
+  markRitualStarted
+} from "@/storage/dailyExecutionStorage";
 import { useAppStore } from "@/store/useAppStore";
-import { AppStats, RescueSession, SleepAudioSession, SleepRecord, UserConfig } from "@/types/app";
 import { formatMinutes, minutesUntil, nowTime, todayKey } from "@/utils/date";
+import { useResponsiveMetrics } from "@/utils/responsive";
 import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
-
-type RouteTarget = Parameters<typeof router.push>[0];
-
-type HomeAction = {
-  title: string;
-  description: string;
-  buttonTitle: string;
-  href?: RouteTarget;
-  disabled?: boolean;
-  startsSession?: boolean;
-};
-
-type HomeViewModel = {
-  title: string;
-  subtitle: string;
-  statusLabel: string;
-  action: HomeAction;
-  secondaryAction?: HomeAction;
-  changeQuote: string;
-  changeBody: string;
-};
-
-type HomeData = {
-  userConfig: UserConfig;
-  session: RescueSession | null;
-  morningCheckInDate: string | null;
-  latestSleepRecord: SleepRecord | null;
-  todayAudioSession: SleepAudioSession | null;
-  morningAudioSession: SleepAudioSession | null;
-  stats: AppStats;
-  weeklyRitualCount: number;
-};
-
-const PRIMARY_TOOLS = [
-  { title: "声音 Spa", href: "/bedtime", tone: "cool", icon: "~" },
-  { title: "下线挑战", href: "/shutdown-challenge", tone: "warm", icon: "2" }
-] as const;
 
 const recentChangeBackground = require("../assets/ui/recent-change-nightscape.png");
 const dreamIllustration = require("../assets/generated/sleep-generator-ui/assets/illustrations/illustration-sleep-generator-dream-01.png");
 const ritualCtaBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-home-ritual-cta-bg-254x76.png");
 const ritualPillBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-sleep-generator-top-pill-bg-clean.png");
 
-function isYesterday(dateKey: string): boolean {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return dateKey === todayKey(yesterday);
-}
-
-function buildRecentChange(data: Pick<HomeData, "stats" | "weeklyRitualCount">): Pick<HomeViewModel, "changeQuote" | "changeBody"> {
-  const { stats, weeklyRitualCount } = data;
-
-  if (weeklyRitualCount > 0) {
-    return {
-      changeQuote: `这周你已经 ${weeklyRitualCount} 次主动开始睡前仪式。`,
-      changeBody: "你正在把夜晚一点点拿回来。"
-    };
-  }
-
-  if (stats.weeklyReviewCount > 0) {
-    return {
-      changeQuote: `这周你写下了 ${stats.weeklyReviewCount} 次今日复盘。`,
-      changeBody: "那些在脑子里打转的事，已经开始有地方安放。"
-    };
-  }
-
-  if (stats.weeklyChallengeCount > 0) {
-    return {
-      changeQuote: `这周你有 ${stats.weeklyChallengeCount} 次在想继续刷时暂停下来。`,
-      changeBody: "能停一下，就已经是在把自己往回带。"
-    };
-  }
-
-  if (typeof stats.averageSleepDeltaMinutes === "number" && stats.averageSleepDeltaMinutes < 0) {
-    return {
-      changeQuote: `本周平均入睡提前 ${Math.abs(stats.averageSleepDeltaMinutes)} 分钟。`,
-      changeBody: "变化不需要很大，稳定一点就会被身体记住。"
-    };
-  }
-
-  return {
-    changeQuote: "今晚先完成一次温柔收尾。",
-    changeBody: "不用立刻变好，只要给今晚一个能做到的边界。"
-  };
-}
-
-function buildHomeState(data: HomeData): HomeViewModel {
-  const { userConfig, session, morningCheckInDate, latestSleepRecord, todayAudioSession, morningAudioSession } = data;
-  const recentChange = buildRecentChange(data);
-  const currentHour = new Date().getHours();
-  const hasFreshFeedback =
-    latestSleepRecord && isYesterday(latestSleepRecord.date) && currentHour >= 5 && currentHour < 18;
-  const countdownMinutes = minutesUntil(userConfig.targetSleepTime);
-  const reminderMinutes = userConfig.reminderMinutesBefore;
-  const isInBedtimeWindow = countdownMinutes <= reminderMinutes;
-
-  if (morningCheckInDate) {
-    const audioHint = morningAudioSession?.status
-      ? "昨晚有声音线索，打卡后可以一起看看。"
-      : "记录醒来的感觉，也是在把昨晚温柔收好。";
-
-    return {
-      title: "补录一下昨晚结果",
-      subtitle: "几十秒就好，这会帮你看见自己正在变好。",
-      statusLabel: "次日打卡",
-      action: {
-        title: "开始次日打卡",
-        description: audioHint,
-        buttonTitle: "开始次日打卡",
-        href: "/checkin"
-      },
-      ...recentChange
-    };
-  }
-
-  if (session?.status === "ready_to_sleep") {
-    const audioStarted = todayAudioSession?.status === "recording";
-
-    return {
-      title: "今晚已经收好了",
-      subtitle: "接下来不用再证明什么，睡觉就是今晚最后一步。",
-      statusLabel: "等待明早补录",
-      action: {
-        title: "明早再来补一笔",
-        description: "明早醒来后，再记录昨晚的实际结果。补录后会生成昨晚反馈，并计入成长记录。",
-        buttonTitle: "明早再来补一笔",
-        disabled: true
-      },
-      secondaryAction: {
-        title: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
-        description: "只在本机记录声音摘要，不上传云端；不开启也不影响次日打卡。",
-        buttonTitle: audioStarted ? "查看睡眠监听" : "开始睡眠监听",
-        href: "/sleep-monitor" as RouteTarget
-      },
-      ...recentChange
-    };
-  }
-
-  if (hasFreshFeedback) {
-    return {
-      title: "昨晚已经有结果了",
-      subtitle: "先看看昨晚留给你的反馈，再开始新的夜晚。",
-      statusLabel: "昨晚反馈",
-      action: {
-        title: "查看昨晚反馈",
-        description: "不是复盘得多完美，而是看见你确实有把自己往回带。",
-        buttonTitle: "查看昨晚反馈",
-        href: "/review"
-      },
-      ...recentChange
-    };
-  }
-
-  if (!session) {
-    return {
-      title: isInBedtimeWindow ? "现在适合开始收尾了" : "今晚先留一个边界",
-      subtitle: isInBedtimeWindow
-        ? "不用立刻睡，只要先把今天慢慢放下。"
-        : "还没到睡前窗口，也可以提前把今晚扶稳一点。",
-      statusLabel: isInBedtimeWindow ? "睡前窗口" : "还没开始",
-      action: {
-        title: isInBedtimeWindow ? "开始今晚仪式" : "提前开始今晚仪式",
-        description: "大约 6 分钟，先收住外界，再把今天放在这里。",
-        buttonTitle: isInBedtimeWindow ? "开始今晚仪式" : "提前开始",
-        href: "/rescue",
-        startsSession: true
-      },
-      ...recentChange
-    };
-  }
-
-  if (session.status === "in_relax_mode" || session.relaxModeUsed || session.sleepGeneratorUsed) {
-    return {
-      title: "现在，让身体慢慢睡着",
-      subtitle: "不需要努力睡着，只要让自己松下来。",
-      statusLabel: "进入睡意",
-      action: {
-        title: "我准备睡了",
-        description: "如果已经放松下来，就把今晚停在这里。",
-        buttonTitle: "我准备睡了",
-        href: "/bedtime"
-      },
-      ...recentChange
-    };
-  }
-
-  if (session.todayReviewCompleted) {
-    return {
-      title: "今天已经被放下了一点",
-      subtitle: "现在可以选一种方式，让睡意慢慢靠近。",
-      statusLabel: "进入睡意",
-      action: {
-        title: "进入睡意生成器",
-        description: "选择声音 Spa、心理暗示或树洞预设，把注意力从脑子里带出来。",
-        buttonTitle: "进入睡意生成器",
-        href: "/sleep-generator"
-      },
-      ...recentChange
-    };
-  }
-
-  if ((session.ritualStep ?? 0) >= 1 || session.status === "in_rescue_flow") {
-    return {
-      title: "把今天放在这里",
-      subtitle: "写一句就好，不用漂亮，也不用完整。",
-      statusLabel: "今晚仪式",
-      action: {
-        title: "把今天放下",
-        description: "写下今天的故事、遗憾和明天一件事。",
-        buttonTitle: "把今天放下",
-        href: { pathname: "/today-review", params: { from: "home" } }
-      },
-      ...recentChange
-    };
-  }
-
-  return {
-    title: "继续今晚仪式",
-    subtitle: "今天不用再接收那么多东西了，我们一步一步来。",
-    statusLabel: "今晚仪式",
-    action: {
-      title: "继续今晚仪式",
-      description: "先收住外界，再把今天慢慢放下。",
-      buttonTitle: "继续今晚仪式",
-      href: "/rescue"
-    },
-    ...recentChange
-  };
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 export default function HomeScreen() {
+  const metrics = useResponsiveMetrics();
+  const homeScale = clampNumber(metrics.contentWidth / 382, 0.82, 1);
+  const heroCardPadding = clampNumber(Math.round(metrics.contentWidth * 0.06), 16, 24);
+  const heroInnerWidth = Math.max(0, metrics.contentWidth - heroCardPadding * 2);
+  const heroImageSize = clampNumber(Math.round(heroInnerWidth * 0.48), 124, 174);
+  const heroImageRight = heroInnerWidth < 300 ? -2 : -4;
+  const heroImageLeft = heroInnerWidth - heroImageSize - heroImageRight;
+  const heroCopyWidth = clampNumber(Math.round(heroImageLeft - 10), 118, 186);
+  const heroTitleSize = clampNumber(Math.round(heroCopyWidth / 4.35), 28, 38);
+  const heroButtonWidth = clampNumber(Math.round(heroInnerWidth * 0.76), 208, 254);
+  const heroButtonHeight = clampNumber(Math.round(heroButtonWidth * 0.3), 62, 76);
+  const heroLayout = {
+    headerTitleSize: clampNumber(Math.round(38 * homeScale), 31, 38),
+    headerTitleLineHeight: clampNumber(Math.round(44 * homeScale), 37, 44),
+    headerSubtitleSize: clampNumber(Math.round(17 * homeScale), 15, 17),
+    headerSubtitleLineHeight: clampNumber(Math.round(25 * homeScale), 22, 25),
+    heroCardPadding,
+    heroCardRadius: clampNumber(Math.round(42 * homeScale), 32, 42),
+    heroBodyMinHeight: Math.max(heroImageSize + 8, 150),
+    heroCopyWidth,
+    heroTitleSize,
+    heroTitleLineHeight: Math.round(heroTitleSize * 1.15),
+    heroBodySize: clampNumber(Math.round(15 * homeScale), 13, 15),
+    heroBodyLineHeight: clampNumber(Math.round(23 * homeScale), 20, 23),
+    heroImageRight,
+    heroImageSize,
+    heroImageRadius: Math.round(heroImageSize / 3),
+    heroImageInnerWidth: Math.round(heroImageSize * 1.06),
+    heroImageInnerHeight: Math.round(heroImageSize * 1.21),
+    heroImageInnerLeft: Math.round(-heroImageSize * 0.03),
+    heroImageInnerTop: Math.round(-heroImageSize * 0.075),
+    heroButtonWidth,
+    heroButtonHeight,
+    heroButtonRadius: Math.round(heroButtonHeight / 2),
+    goalGap: clampNumber(Math.round(14 * homeScale), 10, 14),
+    valueSize: clampNumber(Math.round(30 * homeScale), 25, 30)
+  };
   const [data, setData] = useState<HomeData | null>(null);
   const [clock, setClock] = useState(nowTime());
   const reminderEnabled = useAppStore((state) => state.reminderSettings.enabled);
@@ -270,6 +93,10 @@ export default function HomeScreen() {
       return;
     }
 
+    const todayExecutionRecord = await getDailyExecutionRecordByDate(todayKey());
+    const latestSleepExecutionRecord = latestSleepRecord
+      ? await getDailyExecutionRecordByDate(latestSleepRecord.date)
+      : null;
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - 6);
     const weekStartKey = todayKey(weekStart);
@@ -282,8 +109,10 @@ export default function HomeScreen() {
     setData({
       userConfig,
       session,
+      todayExecutionRecord,
       morningCheckInDate,
       latestSleepRecord,
+      latestSleepExecutionRecord,
       todayAudioSession,
       morningAudioSession,
       stats,
@@ -320,6 +149,10 @@ export default function HomeScreen() {
       await loadHomeData();
     }
 
+    if (viewModel.action.demoCheckinDate) {
+      await markNeedsCheckin(viewModel.action.demoCheckinDate);
+    }
+
     if (viewModel.action.href) {
       router.push(viewModel.action.href);
     }
@@ -340,38 +173,81 @@ export default function HomeScreen() {
       <View style={styles.top}>
         <View style={styles.time}>
           <View style={styles.dot} />
-          <Text style={styles.timeText}>{clock}</Text>
+          <Text style={[styles.timeText, metrics.contentWidth < 330 && styles.timeTextCompact]}>{clock}</Text>
         </View>
-        <Pressable style={styles.ghost} onPress={() => router.push("/settings")}>
-          <Text style={styles.ghostText}>设置</Text>
+        <Pressable style={[styles.ghost, metrics.contentWidth < 330 && styles.ghostCompact]} onPress={() => router.push("/settings")}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.86} style={styles.ghostText}>设置</Text>
         </Pressable>
       </View>
 
-      <View style={styles.header}>
+      <View style={[styles.header, metrics.contentWidth < 330 && styles.headerCompact]}>
         <Text style={styles.eyebrow}>今晚</Text>
-        <Text style={styles.title}>{viewModel.title}</Text>
-        <Text style={styles.subtitle}>{viewModel.subtitle}</Text>
+        <Text style={[styles.title, { fontSize: heroLayout.headerTitleSize, lineHeight: heroLayout.headerTitleLineHeight }]}>{viewModel.title}</Text>
+        <Text style={[styles.subtitle, { fontSize: heroLayout.headerSubtitleSize, lineHeight: heroLayout.headerSubtitleLineHeight }]}>{viewModel.subtitle}</Text>
       </View>
 
-      <View style={styles.heroCard}>
+      <View
+        style={[
+          styles.heroCard,
+          {
+            borderRadius: heroLayout.heroCardRadius,
+            paddingHorizontal: heroLayout.heroCardPadding,
+            paddingTop: heroLayout.heroCardPadding + 2,
+            paddingBottom: heroLayout.heroCardPadding + 4
+          }
+        ]}
+      >
         <View style={styles.statusRow}>
-          <Text style={styles.label}>当前最该做的一件事</Text>
+          <Text style={[styles.label, styles.statusLabelText]}>当前最该做的一件事</Text>
           <ImageBackground
             source={ritualPillBackground}
             resizeMode="stretch"
-            style={styles.statusPill}
+            style={[styles.statusPill, metrics.contentWidth < 330 && styles.statusPillCompact]}
             imageStyle={styles.statusPillImage}
           >
-            <Text style={styles.statusPillText}>{viewModel.statusLabel}</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.statusPillText}>{viewModel.statusLabel}</Text>
           </ImageBackground>
         </View>
-        <View style={styles.heroBody}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.actionTitle}>{viewModel.action.title}</Text>
-            <Text style={styles.body}>{viewModel.action.description}</Text>
+        <View style={[styles.heroBody, { minHeight: heroLayout.heroBodyMinHeight }]}>
+          <View style={[styles.heroCopy, { width: heroLayout.heroCopyWidth }]}>
+            <Text
+              style={[
+                styles.actionTitle,
+                { fontSize: heroLayout.heroTitleSize, lineHeight: heroLayout.heroTitleLineHeight }
+              ]}
+            >
+              {viewModel.action.title}
+            </Text>
+            <Text style={[styles.body, { fontSize: heroLayout.heroBodySize, lineHeight: heroLayout.heroBodyLineHeight }]}>
+              {viewModel.action.description}
+            </Text>
           </View>
-          <View style={styles.dreamFrame} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <Image source={dreamIllustration} style={styles.dreamImage} resizeMode="stretch" />
+          <View
+            style={[
+              styles.dreamFrame,
+              {
+                right: heroLayout.heroImageRight,
+                width: heroLayout.heroImageSize,
+                height: heroLayout.heroImageSize,
+                borderRadius: heroLayout.heroImageRadius
+              }
+            ]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Image
+              source={dreamIllustration}
+              style={[
+                styles.dreamImage,
+                {
+                  left: heroLayout.heroImageInnerLeft,
+                  top: heroLayout.heroImageInnerTop,
+                  width: heroLayout.heroImageInnerWidth,
+                  height: heroLayout.heroImageInnerHeight
+                }
+              ]}
+              resizeMode="stretch"
+            />
           </View>
         </View>
         <Pressable
@@ -381,6 +257,11 @@ export default function HomeScreen() {
           renderToHardwareTextureAndroid={true}
           style={({ pressed }) => [
             styles.heroButton,
+            {
+              width: heroLayout.heroButtonWidth,
+              height: heroLayout.heroButtonHeight,
+              borderRadius: heroLayout.heroButtonRadius
+            },
             viewModel.action.disabled && styles.heroButtonDisabled,
             pressed && !viewModel.action.disabled && styles.pressed
           ]}
@@ -391,7 +272,12 @@ export default function HomeScreen() {
             style={styles.heroButtonBg}
             imageStyle={styles.heroButtonImage}
           >
-            <Text style={[styles.heroButtonText, viewModel.action.disabled && styles.heroButtonTextDisabled]}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+              style={[styles.heroButtonText, viewModel.action.disabled && styles.heroButtonTextDisabled]}
+            >
               {viewModel.action.buttonTitle}
             </Text>
           </ImageBackground>
@@ -405,20 +291,20 @@ export default function HomeScreen() {
                 router.push(viewModel.secondaryAction.href);
               }
             }}
-            style={styles.secondaryButton}
+            style={[styles.secondaryButton, { width: heroLayout.heroButtonWidth }]}
             size="md"
           />
         ) : null}
       </View>
 
-      <View style={styles.goalRow}>
+      <View style={[styles.goalRow, { gap: heroLayout.goalGap }]}>
         <View style={styles.mini}>
           <Text style={styles.label}>目标睡觉</Text>
-          <Text style={styles.value}>{targetTime}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.value, { fontSize: heroLayout.valueSize }]}>{targetTime}</Text>
         </View>
         <View style={styles.mini}>
           <Text style={styles.label}>建议开始</Text>
-          <Text style={styles.value}>{suggestedStart}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.value, { fontSize: heroLayout.valueSize }]}>{suggestedStart}</Text>
         </View>
       </View>
 
@@ -498,6 +384,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800"
   },
+  timeTextCompact: {
+    fontSize: 18
+  },
   ghost: {
     minHeight: 34,
     borderRadius: 18,
@@ -506,6 +395,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 15
   },
+  ghostCompact: {
+    minHeight: 32,
+    paddingHorizontal: 12
+  },
   ghostText: {
     color: colors.ink,
     fontSize: 14,
@@ -513,6 +406,9 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 10
+  },
+  headerCompact: {
+    gap: 8
   },
   eyebrow: {
     color: colors.accent,
@@ -565,12 +461,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900"
   },
+  statusLabelText: {
+    flex: 1
+  },
   statusPill: {
     width: 86,
     height: 36,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden"
+  },
+  statusPillCompact: {
+    width: 78,
+    height: 34
   },
   statusPillImage: {
     borderRadius: 18

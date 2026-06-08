@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
 import { colors } from "@/constants/colors";
+import { useResponsiveMetrics } from "@/utils/responsive";
 
 type AppButtonProps = {
   title: string;
@@ -8,12 +9,13 @@ type AppButtonProps = {
   variant?: "primary" | "secondary" | "ghost" | "danger" | "gradient";
   disabled?: boolean;
   icon?: ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   size?: "md" | "lg";
 };
 
 export function AppButton({ title, onPress, variant = "primary", disabled, icon, style, size = "lg" }: AppButtonProps) {
   const isGradientButton = variant === "primary" || variant === "gradient";
+  const metrics = useResponsiveMetrics();
 
   return (
     <Pressable
@@ -26,17 +28,23 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
         styles[variant],
         isGradientButton && gradientBackgroundStyle,
         size === "md" && styles.sizeMd,
+        metrics.isCompactWidth && styles.compact,
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style
       ]}
     >
       {icon}
-      <Text style={[
-        styles.text,
-        (variant === "ghost" || variant === "secondary" || variant === "danger") && styles.darkText,
-        disabled && styles.disabledText
-      ]}>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.82}
+        style={[
+          styles.text,
+          (variant === "ghost" || variant === "secondary" || variant === "danger") && styles.darkText,
+          disabled && styles.disabledText
+        ]}
+      >
         {title}
       </Text>
     </Pressable>
@@ -62,6 +70,10 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 26,
     paddingHorizontal: 20
+  },
+  compact: {
+    minHeight: 56,
+    paddingHorizontal: 18
   },
   primary: {
     backgroundColor: colors.primary

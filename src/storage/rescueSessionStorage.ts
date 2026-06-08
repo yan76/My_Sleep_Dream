@@ -3,6 +3,24 @@ import { storageKeys } from "@/storage/storageKeys";
 import { defaultSleepAidPreferences } from "@/constants/sleepAidPreferences";
 import { clearSleepAudioSessions } from "@/storage/sleepAudioStorage";
 import {
+  clearDailyCyclesFromSQLite,
+  getDailyCyclesFromSQLite,
+  replaceDailyCyclesInSQLite
+} from "@/storage/sqlite/dailyCycleRepository";
+import { clearSyncQueue, enqueueSyncItem } from "@/storage/sqlite/syncQueueRepository";
+import {
+  clearSleepRecordsFromSQLite,
+  getSleepRecordsFromSQLite,
+  replaceSleepRecordsInSQLite,
+  upsertSleepRecordToSQLite
+} from "@/storage/sqlite/sleepRecordRepository";
+import {
+  clearTodayReviewsFromSQLite,
+  getTodayReviewsFromSQLite,
+  replaceTodayReviewsInSQLite,
+  upsertTodayReviewToSQLite
+} from "@/storage/sqlite/todayReviewRepository";
+import {
   AppStats,
   DailyExecutionRecord,
   LateNightReason,
@@ -151,6 +169,15 @@ function dateTimeForDateKey(date: string, time: string): Date {
 }
 
 async function getDailyExecutionRecordMap(): Promise<StoredDailyExecutionRecords> {
+  try {
+    const sqliteRecords = await getDailyCyclesFromSQLite();
+    if (sqliteRecords.length > 0) {
+      return Object.fromEntries(sqliteRecords.map((record) => [record.date, record]));
+    }
+  } catch (error) {
+    console.warn("[sqlite] Failed to read daily cycles", error);
+  }
+
   return readJson<StoredDailyExecutionRecords>(storageKeys.dailyExecutionRecords, {});
 }
 
@@ -374,6 +401,15 @@ export async function resetTodayRescueFlowProgress(): Promise<RescueSession> {
 }
 
 async function getTodayReviewMap(): Promise<StoredTodayReviews> {
+  try {
+    const sqliteReviews = await getTodayReviewsFromSQLite();
+    if (sqliteReviews.length > 0) {
+      return Object.fromEntries(sqliteReviews.map((review) => [review.date, review]));
+    }
+  } catch (error) {
+    console.warn("[sqlite] Failed to read today reviews", error);
+  }
+
   return readJson<StoredTodayReviews>(storageKeys.todayReviews, {});
 }
 
@@ -410,6 +446,15 @@ export async function saveTodayReview(input: TodayReviewInput): Promise<TodayRev
   };
 
   await writeJson(storageKeys.todayReviews, { ...reviews, [date]: review });
+  await upsertTodayReviewToSQLite(review);
+  await enqueueSyncItem({
+    entityType: "today_review",
+    entityId: review.date,
+    operation: "update",
+    payload: review
+  }).catch((error) => {
+    console.warn("[sync] Failed to enqueue today review", error);
+  });
   await updateTodaySession({
     status: "in_rescue_flow",
     todayReviewCompleted: true,
@@ -420,11 +465,20 @@ export async function saveTodayReview(input: TodayReviewInput): Promise<TodayRev
 }
 
 export async function getSleepRecords(): Promise<SleepRecord[]> {
-  const records = await readJson<StoredSleepRecords>(storageKeys.sleepRecords, {});
+  const records = await getSleepRecordMap();
   return Object.values(records).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 async function getSleepRecordMap(): Promise<StoredSleepRecords> {
+  try {
+    const sqliteRecords = await getSleepRecordsFromSQLite();
+    if (sqliteRecords.length > 0) {
+      return Object.fromEntries(sqliteRecords.map((record) => [record.date, record]));
+    }
+  } catch (error) {
+    console.warn("[sqlite] Failed to read sleep records", error);
+  }
+
   return readJson<StoredSleepRecords>(storageKeys.sleepRecords, {});
 }
 
@@ -470,6 +524,15 @@ export async function createOrUpdateSleepRecord(input: SleepRecordInput = {}): P
   };
 
   await writeJson(storageKeys.sleepRecords, { ...records, [date]: next });
+  await upsertSleepRecordToSQLite(next);
+  await enqueueSyncItem({
+    entityType: "sleep_record",
+    entityId: next.date,
+    operation: "update",
+    payload: next
+  }).catch((error) => {
+    console.warn("[sync] Failed to enqueue sleep record", error);
+  });
 
   if (session && success && session.status !== "completed") {
     await writeJson(storageKeys.rescueSessions, {
@@ -582,7 +645,9 @@ export async function seedGrowthTestData(): Promise<void> {
     writeJson(storageKeys.sleepRecords, nextRecords),
     writeJson(storageKeys.rescueSessions, nextSessions),
     writeJson(storageKeys.todayReviews, nextReviews),
-    writeJson(storageKeys.dailyExecutionRecords, nextExecutionRecords)
+    replaceSleepRecordsInSQLite(Object.values(nextRecords)),
+    replaceTodayReviewsInSQLite(Object.values(nextReviews)),
+    replaceDailyCyclesInSQLite(Object.values(nextExecutionRecords))
   ]);
 }
 
@@ -684,7 +749,11 @@ export async function clearRescueStorage(): Promise<void> {
     appStorage.removeItem(storageKeys.todayReviews),
     appStorage.removeItem(storageKeys.sleepRecords),
     appStorage.removeItem(storageKeys.dailyExecutionRecords),
-    clearSleepAudioSessions()
+    clearSleepAudioSessions(),
+    clearSleepRecordsFromSQLite(),
+    clearTodayReviewsFromSQLite(),
+    clearDailyCyclesFromSQLite(),
+    clearSyncQueue()
   ]);
 }
 

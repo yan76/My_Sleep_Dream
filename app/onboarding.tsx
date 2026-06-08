@@ -10,6 +10,8 @@ import { colors } from "@/constants/colors";
 import { saveUserConfig } from "@/storage/rescueSessionStorage";
 import { lateNightReasons } from "@/constants/reasons";
 import { defaultSleepAidPreferences, sleepAidOptions } from "@/constants/sleepAidPreferences";
+import { scheduleBedtimeReminder } from "@/services/notificationService";
+import { trackAppEvent } from "@/services/analyticsService";
 import { useAppStore } from "@/store/useAppStore";
 import { LateNightReason, SleepAidPreference } from "@/types/app";
 import { isValidTime } from "@/utils/date";
@@ -57,11 +59,21 @@ export default function OnboardingScreen() {
       lateNightReasons: selectedReasons,
       sleepAidPreferences: selectedSleepAidPreferences
     });
+    await scheduleBedtimeReminder({
+      targetBedtime,
+      reminderMinutesBefore,
+      enabled: true
+    }).catch(() => undefined);
+    trackAppEvent("onboarding_completed", {
+      reminderMinutesBefore,
+      lateNightReasonCount: selectedReasons.length,
+      sleepAidPreferenceCount: selectedSleepAidPreferences.length
+    }).catch(() => undefined);
     router.replace("/");
   };
 
   return (
-    <Screen>
+    <Screen reserveBottomNav={false}>
       {/* Decorative welcome badge */}
       <View style={styles.welcomeBadge}>
         <View style={styles.welcomeGlow} />

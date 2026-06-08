@@ -112,11 +112,15 @@ function didMeetPlannedSleepTime(actualSleepTime: string, plannedSleepTime: stri
   return actual !== undefined && planned !== undefined && actual <= planned;
 }
 
-function executionSleepRecords(records: DailyExecutionRecord[]): SleepRecord[] {
+function executionSleepRecords(
+  records: DailyExecutionRecord[],
+  sessionsByDate: Record<string, RescueSession>
+): SleepRecord[] {
   const sleepRecords: SleepRecord[] = [];
 
   records.forEach((record) => {
-    const actualSleepTime = record.actualSleepTime ?? timeFromIso(record.readyToSleepAt);
+    const session = sessionsByDate[record.date];
+    const actualSleepTime = record.actualSleepTime ?? timeFromIso(record.readyToSleepAt) ?? timeFromIso(session?.readyToSleepAt);
 
     if (!actualSleepTime) {
       return;
@@ -138,6 +142,45 @@ function executionSleepRecords(records: DailyExecutionRecord[]): SleepRecord[] {
   });
 
   return sleepRecords;
+}
+
+function sleepRecordFromSession(session: RescueSession, config: UserConfig): SleepRecord | null {
+  const actualSleepTime = timeFromIso(session.readyToSleepAt);
+
+  if (!actualSleepTime) {
+    return null;
+  }
+
+  const timestamp =
+    session.completedAt ??
+    session.readyToSleepAt ??
+    session.startedAt ??
+    new Date(`${session.date}T00:00:00`).toISOString();
+
+  return {
+    id: `rescue-session-sleep:${session.date}`,
+    date: session.date,
+    sessionId: session.id,
+    plannedSleepTime: config.targetSleepTime,
+    actualSleepTime,
+    success: didMeetPlannedSleepTime(actualSleepTime, config.targetSleepTime),
+    createdAt: session.startedAt ?? timestamp,
+    updatedAt: timestamp
+  };
+}
+
+function mergeSessionSleepRecords(
+  records: SleepRecord[],
+  sessions: RescueSession[],
+  config: UserConfig
+): SleepRecord[] {
+  const recordDates = new Set(records.map((record) => record.date));
+  const sessionRecords = sessions
+    .filter((session) => !recordDates.has(session.date))
+    .map((session) => sleepRecordFromSession(session, config))
+    .filter((record): record is SleepRecord => Boolean(record));
+
+  return [...records, ...sessionRecords].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function countExecutionStreak(records: DailyExecutionRecord[]): number {
@@ -347,6 +390,7 @@ export function buildGrowthStats(
   config: UserConfig
 ): GrowthStats {
   const sessions = Object.values(sessionsByDate);
+  const sleepRecords = mergeSessionSleepRecords(records, sessions, config);
   const now = new Date();
   const weekStart = startOfWeek(now);
   const weekEnd = addDays(weekStart, 6);
@@ -357,10 +401,10 @@ export function buildGrowthStats(
   const previousMonthStart = addMonths(monthStart, -1);
   const previousMonthEnd = addDays(monthStart, -1);
 
-  const weeklyRecords = recordsInRange(records, weekStart, weekEnd);
-  const previousWeeklyRecords = recordsInRange(records, previousWeekStart, previousWeekEnd);
-  const monthlyRecords = recordsInRange(records, monthStart, monthEnd);
-  const previousMonthlyRecords = recordsInRange(records, previousMonthStart, previousMonthEnd);
+  const weeklyRecords = recordsInRange(sleepRecords, weekStart, weekEnd);
+  const previousWeeklyRecords = recordsInRange(sleepRecords, previousWeekStart, previousWeekEnd);
+  const monthlyRecords = recordsInRange(sleepRecords, monthStart, monthEnd);
+  const previousMonthlyRecords = recordsInRange(sleepRecords, previousMonthStart, previousMonthEnd);
 
   const weeklyAverage = averageSleepMinutes(weeklyRecords);
   const previousWeeklyAverage = averageSleepMinutes(previousWeeklyRecords);
@@ -377,8 +421,10 @@ export function buildGrowthStats(
   const weekReviews = reviewsInRange(reviews, weekStart, weekEnd);
   const previousFailures = previousMonthlyRecords.filter((record) => !record.success).length;
   const monthFailures = monthlyRecords.filter((record) => !record.success).length;
-  const allFailures = records.filter((record) => !record.success).length;
-  const firstMonthRecords = records.length ? records.filter((record) => record.date.startsWith(records[0].date.slice(0, 7))) : [];
+  const allFailures = sleepRecords.filter((record) => !record.success).length;
+  const firstMonthRecords = sleepRecords.length
+    ? sleepRecords.filter((record) => record.date.startsWith(sleepRecords[0].date.slice(0, 7)))
+    : [];
   const firstMonthFailures = firstMonthRecords.filter((record) => !record.success).length;
 
   const monthlyAverageCopy = formatAverageDelta(monthlyDelta);
@@ -393,12 +439,12 @@ export function buildGrowthStats(
     goodMoodCount: weeklyRecords.filter((record) => goodMoodLabels.has(record.moodNextMorning ?? "")).length,
     stableNightCount: monthlyRecords.filter((record) => record.success).length,
     cumulativeReviewCount: reviews.length,
-    longestStreak: countLongestStreak(records),
+    longestStreak: countLongestStreak(sleepRecords),
     lessLateCount: Math.max(0, previousFailures - monthFailures, firstMonthFailures - allFailures),
     startBeforeTargetCount: countStartBeforeTarget(monthSessions.length ? monthSessions : sessions, config),
-    weekBars: createWeekBars(records, weekStart),
-    monthPoints: createFourWeekPoints(records, monthStart),
-    allPoints: createSixMonthPoints(records, now)
+    weekBars: createWeekBars(sleepRecords, weekStart),
+    monthPoints: createFourWeekPoints(sleepRecords, monthStart),
+    allPoints: createSixMonthPoints(sleepRecords, now)
   };
 }
 
@@ -416,7 +462,7 @@ export function buildGrowthStatsFromExecutionRecords(
   const monthEnd = addDays(addMonths(monthStart, 1), -1);
   const executionDates = executionDateSet(executionRecords);
   const legacyRecords = legacySleepRecords.filter((record) => !executionDates.has(record.date));
-  const sleepRecords = [...executionSleepRecords(executionRecords), ...legacyRecords].sort((a, b) =>
+  const sleepRecords = [...executionSleepRecords(executionRecords, sessionsByDate), ...legacyRecords].sort((a, b) =>
     a.date.localeCompare(b.date)
   );
 

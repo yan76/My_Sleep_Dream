@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useResponsiveMetrics } from "@/utils/responsive";
 
 type BottomNavProps = {
   active: "home" | "rescue" | "growth" | "settings" | "review" | "audio" | "checkin";
@@ -29,16 +30,40 @@ function NavIcon({ name }: { name: NavKey; active: boolean }) {
 }
 
 export function BottomNav({ active }: BottomNavProps) {
+  const metrics = useResponsiveMetrics();
+
   return (
-    <View style={styles.bar}>
+    <View
+      style={[
+        styles.bar,
+        {
+          minHeight: metrics.bottomNavHeight + metrics.safeAreaBottom,
+          maxWidth: metrics.isTablet ? 560 : undefined,
+          paddingHorizontal: metrics.bottomNavHorizontalPadding,
+          paddingTop: metrics.bottomNavTopPadding,
+          paddingBottom: metrics.bottomNavBottomPadding
+        }
+      ]}
+    >
       {navItems.map((item) => {
         const isActive = item.key === active;
         return (
-          <Pressable key={item.key} onPress={() => router.push(item.href)} style={styles.item}>
+          <Pressable
+            key={item.key}
+            onPress={() => router.push(item.href)}
+            style={[styles.item, metrics.isCompactWidth && styles.itemCompact]}
+          >
             <View style={styles.iconWrap}>
               <NavIcon name={item.key} active={isActive} />
             </View>
-            <Text style={[styles.label, isActive && styles.activeLabel]}>{item.label}</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.86}
+              style={[styles.label, isActive && styles.activeLabel]}
+            >
+              {item.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -49,10 +74,7 @@ export function BottomNav({ active }: BottomNavProps) {
 const styles = StyleSheet.create({
   bar: {
     width: "100%",
-    height: 104,
-    paddingHorizontal: 42,
-    paddingTop: 16,
-    paddingBottom: 18,
+    alignSelf: "center",
     borderTopLeftRadius: 34,
     borderTopRightRadius: 34,
     borderWidth: 1,
@@ -68,6 +90,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
     gap: 4
+  },
+  itemCompact: {
+    width: 52,
+    height: 68
   },
   iconWrap: {
     width: 38,

@@ -5,6 +5,8 @@ import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
+import { buildRescueViewModel } from "@/features/rescue/rescueViewModel";
+import type { FlowStep, RescueData } from "@/features/rescue/rescueViewModel";
 import {
   getTodaySession,
   getUserConfig,
@@ -14,149 +16,15 @@ import {
   updateTodayRitualStep
 } from "@/storage/rescueSessionStorage";
 import {
+  getDailyExecutionRecordByDate,
   markExternalClosed,
   markReadyToSleep as markExecutionReadyToSleep,
   markRescuePause,
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
-import { RescueSession, UserConfig } from "@/types/app";
-import { getReasonBasedRescueHint, getSuggestedRescueTime } from "@/utils/sleepPreferences";
-
-type RescueData = {
-  session: RescueSession | null;
-  userConfig: UserConfig;
-};
-
-type FlowStepId = "external" | "review" | "sleep";
-type StepState = "done" | "active" | "locked";
-
-type FlowStep = {
-  id: FlowStepId;
-  title: string;
-  body: string;
-  state: StepState;
-};
-
-type RescueViewModel = {
-  title: string;
-  subtitle: string;
-  statusLabel: string;
-  primaryTitle: string;
-  primaryBody: string;
-  primaryButton: string;
-  completed: boolean;
-  steps: FlowStep[];
-};
-
-function getStepState(id: FlowStepId, session: RescueSession | null): StepState {
-  const externalDone = (session?.ritualStep ?? 0) >= 1;
-  const reviewDone = Boolean(session?.todayReviewCompleted);
-  const sleepDone = Boolean(session?.sleepGeneratorUsed || session?.relaxModeUsed || session?.treeHoleUsed);
-
-  if (id === "external") {
-    return externalDone || reviewDone || sleepDone || session?.status === "ready_to_sleep" ? "done" : "active";
-  }
-
-  if (id === "review") {
-    if (reviewDone || sleepDone || session?.status === "ready_to_sleep") {
-      return "done";
-    }
-    return externalDone ? "active" : "locked";
-  }
-
-  if (sleepDone || session?.status === "ready_to_sleep") {
-    return "done";
-  }
-
-  return reviewDone ? "active" : "locked";
-}
-
-function buildRescueViewModel(session: RescueSession | null, userConfig?: UserConfig): RescueViewModel {
-  const rescueHint = getReasonBasedRescueHint(userConfig?.lateNightReasons ?? []);
-  const steps: FlowStep[] = [
-    {
-      id: "external",
-      title: "收住外界",
-      body: rescueHint,
-      state: getStepState("external", session)
-    },
-    {
-      id: "review",
-      title: "把今天放下",
-      body: "写一句也可以，把占脑子的事先放到这里。",
-      state: getStepState("review", session)
-    },
-    {
-      id: "sleep",
-      title: "进入睡意",
-      body: "选一种声音、暗示或树洞，让身体慢慢松下来。",
-      state: getStepState("sleep", session)
-    }
-  ];
-
-  if (session?.status === "ready_to_sleep") {
-    return {
-      title: "今晚已经可以停在这里",
-      subtitle: "今天已经收好了，接下来不用继续证明什么。",
-      statusLabel: "准备睡觉",
-      primaryTitle: "今晚闭环完成",
-      primaryBody: "明早醒来后，再轻轻补一笔昨晚结果就好。",
-      primaryButton: "回到首页",
-      completed: true,
-      steps
-    };
-  }
-
-  if (session?.sleepGeneratorUsed || session?.relaxModeUsed || session?.treeHoleUsed) {
-    return {
-      title: "睡意已经被请进来了",
-      subtitle: "现在不用努力睡着，只要别再把脑子重新点亮。",
-      statusLabel: "进入睡意",
-      primaryTitle: "把今晚收住",
-      primaryBody: "如果身体已经松下来，就把今晚停在这里。",
-      primaryButton: "我准备睡了",
-      completed: false,
-      steps
-    };
-  }
-
-  if (session?.todayReviewCompleted) {
-    return {
-      title: "今天已经被放下了一点",
-      subtitle: "做完的、没做完的，都先放在这里。现在换一种方式进入睡意。",
-      statusLabel: "把今天放下",
-      primaryTitle: "进入睡意",
-      primaryBody: "选择声音 Spa、心理暗示或树洞，把注意力从脑子里带出来。",
-      primaryButton: "进入睡意生成器",
-      completed: false,
-      steps
-    };
-  }
-
-  if ((session?.ritualStep ?? 0) >= 1 || session?.status === "in_rescue_flow") {
-    return {
-      title: "外界先收住了",
-      subtitle: "下一步不用写很多，只要把今天从脑子里挪出来一点。",
-      statusLabel: "收住外界",
-      primaryTitle: "把今天放下",
-      primaryBody: "今天的故事、遗憾和明天一件小事，都可以先放在这里。",
-      primaryButton: "去把今天放下",
-      completed: false,
-      steps
-    };
-  }
-
-  return {
-    title: "先把今晚往回带一点",
-    subtitle: "不用立刻睡，也不用立刻变自律。先别再开新的内容。",
-    statusLabel: session ? "今晚自救" : "还没开始",
-    primaryTitle: "收住外界",
-    primaryBody: rescueHint,
-    primaryButton: "先把外界收住",
-    completed: false,
-    steps
-  };
-}
+import { dailyCycleAtLeast } from "@/utils/dailyCycle";
+import { todayKey } from "@/utils/date";
+import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
 
 function StepCard({ step, index }: { step: FlowStep; index: number }) {
   const isDone = step.state === "done";
@@ -185,8 +53,12 @@ export default function RescueScreen() {
   const [showExternalCloseDialog, setShowExternalCloseDialog] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [session, userConfig] = await Promise.all([getTodaySession(), getUserConfig()]);
-    setData({ session, userConfig });
+    const [session, executionRecord, userConfig] = await Promise.all([
+      getTodaySession(),
+      getDailyExecutionRecordByDate(todayKey()),
+      getUserConfig()
+    ]);
+    setData({ session, executionRecord, userConfig });
   }, []);
 
   useFocusEffect(
@@ -195,7 +67,10 @@ export default function RescueScreen() {
     }, [loadData])
   );
 
-  const viewModel = useMemo(() => buildRescueViewModel(data?.session ?? null, data?.userConfig), [data?.session, data?.userConfig]);
+  const viewModel = useMemo(
+    () => buildRescueViewModel(data?.session ?? null, data?.executionRecord ?? null, data?.userConfig),
+    [data?.session, data?.executionRecord, data?.userConfig]
+  );
   const targetTime = data?.userConfig.targetSleepTime ?? "23:30";
   const suggestedStart = data
     ? getSuggestedRescueTime(data.userConfig.targetSleepTime, data.userConfig.reminderMinutesBefore)
@@ -208,32 +83,46 @@ export default function RescueScreen() {
 
     setIsWorking(true);
     try {
-      const session = data?.session ?? (await startTodaySession());
-      await markRitualStarted();
+      const session = data?.session ?? null;
+      const executionRecord = data?.executionRecord ?? null;
 
-      if (session.status === "ready_to_sleep") {
+      if (dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep") {
         router.push("/");
         return;
       }
 
-      if (session.sleepGeneratorUsed || session.relaxModeUsed || session.treeHoleUsed) {
+      if (
+        dailyCycleAtLeast(executionRecord, "sleep_aid_started") ||
+        session?.sleepGeneratorUsed ||
+        session?.relaxModeUsed ||
+        session?.treeHoleUsed
+      ) {
         await markReadyToSleep();
         await markExecutionReadyToSleep();
         await loadData();
         return;
       }
 
-      if (session.todayReviewCompleted) {
+      if (dailyCycleAtLeast(executionRecord, "review_completed") || session?.todayReviewCompleted) {
         router.push("/sleep-generator");
         return;
       }
 
-      if ((session.ritualStep ?? 0) >= 1 || session.status === "in_rescue_flow") {
+      if (
+        dailyCycleAtLeast(executionRecord, "external_closed") ||
+        (session?.ritualStep ?? 0) >= 1 ||
+        session?.status === "in_rescue_flow"
+      ) {
         router.push({ pathname: "/today-review", params: { from: "rescue" } });
         return;
       }
 
-      setData((current) => (current ? { ...current, session } : current));
+      const startedSession = session ?? (await startTodaySession());
+      if (!dailyCycleAtLeast(executionRecord, "ritual_started")) {
+        await markRitualStarted();
+      }
+
+      setData((current) => (current ? { ...current, session: startedSession } : current));
       setShowExternalCloseDialog(true);
     } finally {
       setIsWorking(false);

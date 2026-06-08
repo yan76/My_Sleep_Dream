@@ -1,4 +1,19 @@
+import {
+  applyDailyCycleUpdate,
+  classifySleepResult,
+  createDefaultDailyCycle,
+  normalizeDailyCycleRecord
+} from "@/features/daily-cycle/dailyCycleModel";
+import { trackAppEvent } from "@/services/analyticsService";
 import { appStorage } from "@/storage/appStorage";
+import {
+  clearDailyCyclesFromSQLite,
+  getDailyCycleFromSQLiteByDate,
+  getDailyCyclesFromSQLite,
+  replaceDailyCyclesInSQLite,
+  upsertDailyCycleToSQLite
+} from "@/storage/sqlite/dailyCycleRepository";
+import { enqueueSyncItem } from "@/storage/sqlite/syncQueueRepository";
 import { storageKeys } from "@/storage/storageKeys";
 import { getUserConfig } from "@/storage/rescueSessionStorage";
 import {
@@ -6,10 +21,9 @@ import {
   DailyExecutionStatus,
   LateNightReason,
   MorningMood,
-  SleepAidPreference,
-  SleepResult
+  SleepAidPreference
 } from "@/types/app";
-import { timeToMinutes, todayKey } from "@/utils/date";
+import { todayKey } from "@/utils/date";
 
 type StoredDailyExecutionRecords = Record<string, DailyExecutionRecord>;
 
@@ -28,87 +42,93 @@ type CheckinInput = {
 
 const nowIso = () => new Date().toISOString();
 
-const statusRank: Record<DailyExecutionStatus, number> = {
-  not_started: 0,
-  ritual_started: 1,
-  external_closed: 2,
-  review_completed: 3,
-  sleep_aid_started: 4,
-  ready_to_sleep: 5,
-  needs_checkin: 6,
-  checked_in: 7
-};
+let legacyDailyCycleMigrationChecked = false;
 
-async function readExecutionMap(): Promise<StoredDailyExecutionRecords> {
+async function readLegacyExecutionMap(): Promise<StoredDailyExecutionRecords> {
   try {
     const value = await appStorage.getItem(storageKeys.dailyExecutionRecords);
     return value ? (JSON.parse(value) as StoredDailyExecutionRecords) : {};
   } catch (error) {
-    console.warn("[storage] Failed to read daily execution records", error);
+    console.warn("[storage] Failed to read legacy daily execution records", error);
     return {};
   }
 }
 
-async function writeExecutionMap(records: StoredDailyExecutionRecords): Promise<void> {
+async function ensureLegacyDailyCyclesMigrated(): Promise<void> {
+  if (legacyDailyCycleMigrationChecked) {
+    return;
+  }
+
+  legacyDailyCycleMigrationChecked = true;
+
   try {
-    await appStorage.setItem(storageKeys.dailyExecutionRecords, JSON.stringify(records));
+    const sqliteRecords = await getDailyCyclesFromSQLite();
+    if (sqliteRecords.length > 0) {
+      return;
+    }
+
+    const legacyRecords = Object.values(await readLegacyExecutionMap()).map(normalizeDailyCycleRecord);
+    if (legacyRecords.length > 0) {
+      await replaceDailyCyclesInSQLite(legacyRecords, { syncStatus: "pending" });
+    }
   } catch (error) {
-    console.warn("[storage] Failed to write daily execution records", error);
+    console.warn("[sqlite] Failed to migrate legacy daily cycles on demand", error);
   }
 }
 
-function strongerStatus(current: DailyExecutionStatus, next: DailyExecutionStatus): DailyExecutionStatus {
-  return statusRank[next] > statusRank[current] ? next : current;
+async function readExecutionMap(): Promise<StoredDailyExecutionRecords> {
+  await ensureLegacyDailyCyclesMigrated();
+
+  try {
+    const sqliteRecords = await getDailyCyclesFromSQLite();
+    return Object.fromEntries(sqliteRecords.map((record) => [record.date, normalizeDailyCycleRecord(record)]));
+  } catch (error) {
+    console.warn("[sqlite] Failed to read daily cycles", error);
+    return {};
+  }
 }
 
-function classifySleepResult(actualSleepTime: string, plannedSleepTime: string): SleepResult {
-  const actual = timeToMinutes(actualSleepTime);
-  const planned = timeToMinutes(plannedSleepTime);
-  const normalizedActual = actual < 12 * 60 ? actual + 24 * 60 : actual;
-  const normalizedPlanned = planned < 12 * 60 ? planned + 24 * 60 : planned;
-  const delta = normalizedActual - normalizedPlanned;
+async function readExecutionRecord(date: string): Promise<DailyExecutionRecord | null> {
+  await ensureLegacyDailyCyclesMigrated();
 
-  if (delta <= 15) {
-    return "near_target";
+  try {
+    const record = await getDailyCycleFromSQLiteByDate(date);
+    return record ? normalizeDailyCycleRecord(record) : null;
+  } catch (error) {
+    console.warn("[sqlite] Failed to read daily cycle", error);
+    return null;
   }
-
-  if (delta <= 30) {
-    return "slightly_late";
-  }
-
-  return "very_late";
 }
 
 async function createDefaultRecord(date: string): Promise<DailyExecutionRecord> {
   const config = await getUserConfig();
-  const now = nowIso();
-
-  return {
-    date,
-    plannedSleepTime: config.targetSleepTime,
-    wakeUpTime: config.wakeUpTime,
-    status: "not_started",
-    usedSoundSpa: false,
-    usedTreeHole: false,
-    usedSleepGenerator: false,
-    shutdownChallengeCount: 0,
-    rescuePauseCount: 0,
-    createdAt: now,
-    updatedAt: now
-  };
+  return createDefaultDailyCycle(date, {
+    targetSleepTime: config.targetSleepTime,
+    wakeUpTime: config.wakeUpTime
+  });
 }
 
-function normalizeRecord(record: DailyExecutionRecord): DailyExecutionRecord {
-  return {
-    ...record,
-    status: record.status ?? "not_started",
-    usedSoundSpa: record.usedSoundSpa ?? false,
-    usedTreeHole: record.usedTreeHole ?? false,
-    usedSleepGenerator: record.usedSleepGenerator ?? false,
-    shutdownChallengeCount: record.shutdownChallengeCount ?? 0,
-    rescuePauseCount: record.rescuePauseCount ?? 0,
-    sleepAudioEnabled: record.sleepAudioEnabled ?? false
-  };
+async function persistExecutionRecord(
+  record: DailyExecutionRecord,
+  options: { enqueueSync?: boolean; syncStatus?: "local_only" | "pending" | "synced" } = {}
+): Promise<DailyExecutionRecord> {
+  const normalized = normalizeDailyCycleRecord(record);
+  const enqueueSync = options.enqueueSync ?? true;
+
+  await upsertDailyCycleToSQLite(normalized, { syncStatus: options.syncStatus ?? (enqueueSync ? "pending" : "local_only") });
+
+  if (enqueueSync) {
+    await enqueueSyncItem({
+      entityType: "daily_cycle",
+      entityId: normalized.date,
+      operation: "update",
+      payload: normalized
+    }).catch((error) => {
+      console.warn("[sync] Failed to enqueue daily cycle", error);
+    });
+  }
+
+  return normalized;
 }
 
 async function updateExecutionRecord(
@@ -116,46 +136,37 @@ async function updateExecutionRecord(
   patch: Partial<DailyExecutionRecord>,
   nextStatus?: DailyExecutionStatus
 ): Promise<DailyExecutionRecord> {
-  const records = await readExecutionMap();
-  const current = records[date] ? normalizeRecord(records[date]) : await createDefaultRecord(date);
-  const updated: DailyExecutionRecord = {
-    ...current,
-    ...patch,
-    status: nextStatus ? strongerStatus(current.status, nextStatus) : current.status,
-    updatedAt: nowIso()
-  };
-
-  await writeExecutionMap({ ...records, [date]: updated });
-  return updated;
+  const current = (await readExecutionRecord(date)) ?? (await createDefaultRecord(date));
+  const updated = applyDailyCycleUpdate(current, patch, nextStatus, nowIso());
+  return persistExecutionRecord(updated);
 }
 
 export async function getDailyExecutionRecords(): Promise<DailyExecutionRecord[]> {
   const records = await readExecutionMap();
   return Object.values(records)
-    .map(normalizeRecord)
+    .map(normalizeDailyCycleRecord)
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export async function getDailyExecutionRecordByDate(date: string): Promise<DailyExecutionRecord | null> {
-  const records = await readExecutionMap();
-  return records[date] ? normalizeRecord(records[date]) : null;
+  return readExecutionRecord(date);
 }
 
 export async function ensureDailyExecutionRecord(date = todayKey()): Promise<DailyExecutionRecord> {
-  const records = await readExecutionMap();
-  const current = records[date];
+  const current = await readExecutionRecord(date);
 
   if (current) {
-    return normalizeRecord(current);
+    return current;
   }
 
   const next = await createDefaultRecord(date);
-  await writeExecutionMap({ ...records, [date]: next });
-  return next;
+  return persistExecutionRecord(next, { enqueueSync: false, syncStatus: "local_only" });
 }
 
 export async function markRitualStarted(date = todayKey()): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(date, { ritualStartedAt: nowIso() }, "ritual_started");
+  const record = await updateExecutionRecord(date, { ritualStartedAt: nowIso() }, "ritual_started");
+  trackAppEvent("rescue_started", { date }).catch(() => undefined);
+  return record;
 }
 
 export async function markExternalClosed(date = todayKey()): Promise<DailyExecutionRecord> {
@@ -163,13 +174,15 @@ export async function markExternalClosed(date = todayKey()): Promise<DailyExecut
 }
 
 export async function markReviewCompleted(date = todayKey()): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(date, { reviewCompletedAt: nowIso() }, "review_completed");
+  const record = await updateExecutionRecord(date, { reviewCompletedAt: nowIso() }, "review_completed");
+  trackAppEvent("today_review_completed", { date }).catch(() => undefined);
+  return record;
 }
 
 export async function markSleepAidStarted(input: SleepAidInput = {}, date = todayKey()): Promise<DailyExecutionRecord> {
   const current = await ensureDailyExecutionRecord(date);
   const aid = input.aid;
-  return updateExecutionRecord(
+  const record = await updateExecutionRecord(
     date,
     {
       sleepAidStartedAt: nowIso(),
@@ -179,6 +192,8 @@ export async function markSleepAidStarted(input: SleepAidInput = {}, date = toda
     },
     "sleep_aid_started"
   );
+  trackAppEvent("sleep_aid_used", { date, aid: typeof aid === "string" ? aid : "unknown" }).catch(() => undefined);
+  return record;
 }
 
 export async function markReadyToSleep(date = todayKey()): Promise<DailyExecutionRecord> {
@@ -191,6 +206,10 @@ export async function markNeedsCheckin(date: string): Promise<DailyExecutionReco
 
 export async function markSleepAudioEnabled(sessionId: string, date = todayKey()): Promise<DailyExecutionRecord> {
   return updateExecutionRecord(date, { sleepAudioEnabled: true, sleepAudioSessionId: sessionId });
+}
+
+export async function markSleepAudioDeleted(date = todayKey()): Promise<DailyExecutionRecord> {
+  return updateExecutionRecord(date, { sleepAudioEnabled: false, sleepAudioSessionId: undefined });
 }
 
 export async function markRescuePause(date = todayKey()): Promise<DailyExecutionRecord> {
@@ -212,7 +231,7 @@ export async function completeMorningCheckin(input: CheckinInput = {}): Promise<
   const current = await ensureDailyExecutionRecord(date);
   const actualSleepTime = input.actualSleepTime?.trim();
 
-  return updateExecutionRecord(
+  const record = await updateExecutionRecord(
     date,
     {
       checkinCompletedAt: nowIso(),
@@ -225,10 +244,17 @@ export async function completeMorningCheckin(input: CheckinInput = {}): Promise<
     },
     "checked_in"
   );
+  trackAppEvent("checkin_completed", { date, sleepResult: record.sleepResult ?? null }).catch(() => undefined);
+  return record;
+}
+
+export async function markFeedbackViewed(date: string): Promise<DailyExecutionRecord> {
+  return updateExecutionRecord(date, { feedbackViewedAt: nowIso() }, "feedback_viewed");
 }
 
 export async function clearDailyExecutionRecords(): Promise<void> {
   await appStorage.removeItem(storageKeys.dailyExecutionRecords);
+  await clearDailyCyclesFromSQLite();
 }
 
 export { classifySleepResult };

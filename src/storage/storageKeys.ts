@@ -5,5 +5,10 @@ export const storageKeys = {
   todayReviews: "my-sleep-dream:today-reviews",
   sleepRecords: "my-sleep-dream:sleep-records",
   dailyExecutionRecords: "my-sleep-dream:daily-execution-records",
-  sleepAudioSessions: "my-sleep-dream:sleep-audio-sessions"
+  sleepAudioSessions: "my-sleep-dream:sleep-audio-sessions",
+  aiGeneratedOutputs: "my-sleep-dream:ai-generated-outputs",
+  sqliteMigrationVersion: "my-sleep-dream:sqlite-migration-version",
+  localReminderNotificationId: "my-sleep-dream:local-reminder-notification-id",
+  localReminderSnapshot: "my-sleep-dream:local-reminder-snapshot",
+  appEvents: "my-sleep-dream:app-events"
 };

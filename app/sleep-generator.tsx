@@ -5,9 +5,19 @@ import { AppButton } from "@/components/common/AppButton";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { SleepAidOption } from "@/constants/sleepAidPreferences";
-import { getUserConfig, markSleepGeneratorUsed, markTreeHoleUsed } from "@/storage/rescueSessionStorage";
-import { markSleepAidStarted } from "@/storage/dailyExecutionStorage";
-import { UserConfig } from "@/types/app";
+import {
+  getTodayReview,
+  getUserConfig,
+  markReadyToSleep,
+  markSleepGeneratorUsed,
+  markTreeHoleUsed
+} from "@/storage/rescueSessionStorage";
+import {
+  markReadyToSleep as markExecutionReadyToSleep,
+  markSleepAidStarted
+} from "@/storage/dailyExecutionStorage";
+import { generateSleepScript, SleepScriptResult } from "@/services/sleepScriptService";
+import { TodayReview, UserConfig } from "@/types/app";
 import { getRecommendedSleepAids } from "@/utils/sleepPreferences";
 
 const generatorBackground = require("../assets/ui/sleep-generator-background-alpha.png");
@@ -48,10 +58,15 @@ function AidCard({ aid, index, primary, disabled, onPress }: AidCardProps) {
 
 export default function SleepGeneratorScreen() {
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
+  const [todayReview, setTodayReview] = useState<TodayReview | null>(null);
+  const [scriptResult, setScriptResult] = useState<SleepScriptResult | null>(null);
   const [isChoosing, setIsChoosing] = useState(false);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
   const loadConfig = useCallback(async () => {
-    setUserConfig(await getUserConfig());
+    const [config, review] = await Promise.all([getUserConfig(), getTodayReview()]);
+    setUserConfig(config);
+    setTodayReview(review);
   }, []);
 
   useFocusEffect(
@@ -86,6 +101,27 @@ export default function SleepGeneratorScreen() {
     }
   };
 
+  const generateNightHint = async () => {
+    if (!userConfig || isGeneratingScript) {
+      return;
+    }
+
+    setIsGeneratingScript(true);
+    try {
+      const result = await generateSleepScript({
+        targetSleepTime: userConfig.targetSleepTime,
+        lateNightReasons: userConfig.lateNightReasons,
+        sleepAidPreferences: userConfig.sleepAidPreferences,
+        review: todayReview
+      });
+      setScriptResult(result);
+      await markSleepGeneratorUsed("AI 睡意暗示");
+      await markSleepAidStarted({ aid: "suggestion" });
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
   const prepareToSleep = async () => {
     if (isChoosing) {
       return;
@@ -95,6 +131,8 @@ export default function SleepGeneratorScreen() {
     try {
       await markSleepGeneratorUsed(primaryAid?.label ?? "睡意生成器");
       await markSleepAidStarted({ aid: primaryAid?.id ?? "sleep_generator" });
+      await markReadyToSleep();
+      await markExecutionReadyToSleep();
       router.replace("/rescue");
     } finally {
       setIsChoosing(false);
@@ -146,6 +184,28 @@ export default function SleepGeneratorScreen() {
           />
         </View>
       ) : null}
+
+      <View style={styles.scriptCard}>
+        <View style={styles.scriptHeader}>
+          <Text style={styles.label}>AI 睡意生成</Text>
+          <Text style={styles.scriptSource}>{scriptResult ? (scriptResult.source === "cloud" ? "云端生成" : "本地兜底") : "可离线兜底"}</Text>
+        </View>
+        <Text style={styles.scriptTitle}>生成今晚的晚安暗示</Text>
+        <Text style={styles.body}>结合晚睡原因、助眠偏好和今日复盘，生成一段不评判、不讲大道理的睡前收束文案。</Text>
+        <AppButton
+          title={isGeneratingScript ? "生成中..." : scriptResult ? "重新生成" : "生成今晚暗示"}
+          variant="secondary"
+          onPress={generateNightHint}
+          disabled={isChoosing || isGeneratingScript}
+          style={styles.primaryButton}
+        />
+        {scriptResult ? (
+          <View style={styles.scriptResult}>
+            <Text style={styles.scriptResultTitle}>{scriptResult.title}</Text>
+            <Text style={styles.scriptBody}>{scriptResult.script}</Text>
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.optionList}>
         {recommendedAids.map((aid, index) => (
@@ -286,6 +346,52 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 4
+  },
+  scriptCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(138, 151, 255, 0.32)",
+    backgroundColor: colors.surfaceCool,
+    padding: 22,
+    gap: 14
+  },
+  scriptHeader: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  scriptSource: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  scriptTitle: {
+    color: colors.ink,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "900"
+  },
+  scriptResult: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    backgroundColor: "#111323",
+    padding: 16,
+    gap: 10
+  },
+  scriptResultTitle: {
+    color: colors.accent,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "900"
+  },
+  scriptBody: {
+    color: colors.ink,
+    fontSize: 15,
+    lineHeight: 24,
+    fontWeight: "700"
   },
   optionList: {
     gap: 12

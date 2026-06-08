@@ -7,6 +7,7 @@ import { Badge, BadgeId, DailyRecord, ReminderSettings, UserConfig } from "@/typ
 import { createInitialBadges, updateBadges } from "@/utils/badges";
 import { didSleepOnTime } from "@/utils/sleep";
 import { nowTime, todayKey } from "@/utils/date";
+import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
 
 type ReviewInput = {
   events: string;
@@ -118,6 +119,7 @@ export const useAppStore = create<AppStore>()(
           },
           reminderSettings: {
             ...defaultReminderSettings,
+            reminderTime: getSuggestedRescueTime(input.targetBedtime, reminderMinutesBefore),
             bedtimeModeReminderMinutesBefore: reminderMinutesBefore
           }
         });

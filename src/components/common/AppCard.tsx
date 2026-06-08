@@ -1,20 +1,23 @@
 import { ReactNode } from "react";
-import { StyleSheet, View, ViewStyle } from "react-native";
+import { StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { colors } from "@/constants/colors";
+import { useResponsiveMetrics } from "@/utils/responsive";
 
 type AppCardProps = {
   children: ReactNode;
   tone?: "plain" | "warm" | "cool" | "lavender" | "mint" | "rose";
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
 
 export function AppCard({ children, tone = "plain", style }: AppCardProps) {
+  const metrics = useResponsiveMetrics();
+
   return (
     <View
       style={[styles.card, styles[tone], style]}
       renderToHardwareTextureAndroid={true}
     >
-      <View style={styles.inner}>{children}</View>
+      <View style={[styles.inner, { padding: metrics.cardPadding, gap: metrics.cardGap }]}>{children}</View>
     </View>
   );
 }
@@ -27,8 +30,6 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   inner: {
-    padding: 22,
-    gap: 14
   },
   plain: {
     backgroundColor: colors.surface

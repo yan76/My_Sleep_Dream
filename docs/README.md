@@ -39,7 +39,10 @@
 - [组件拆分](./03-ui/components.md)
 - [本地数据模型](./04-data/local-data-model.md)
 - [状态与存储设计](./04-data/state-and-storage.md)
+- [可上线版本数据模型与状态流设计 06-05](./04-data/launch-data-model-06-05.md)
 - [开发手册](./05-development/development-plan.md)
+- [Android APK Demo 交付说明](./05-development/android-demo.md)
+- [16 周可上线优化方案 06-05](./05-development/launch-optimization-plan-06-05.md)
 - [验收标准](./06-acceptance/acceptance-criteria.md)
 - [新主流程 UI 原型](./sleep-ritual-ui-prototype.html)
 

@@ -2,17 +2,11 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { isDemoMode } from "@/constants/demo";
+import { buildGrowthStats, loadGrowthData, seedGrowthTestData } from "@/features/growth/growthData";
+import type { GrowthData } from "@/features/growth/growthData";
+import type { DailyExecutionRecord, SleepRecord, TodayReview } from "@/types/app";
 import {
-  getRescueSessions,
-  getSleepRecords,
-  getTodayReviews,
-  getUserConfig,
-  seedGrowthTestData
-} from "@/storage/rescueSessionStorage";
-import { getDailyExecutionRecords } from "@/storage/dailyExecutionStorage";
-import { DailyExecutionRecord, RescueSession, SleepRecord, TodayReview, UserConfig } from "@/types/app";
-import {
-  buildGrowthStatsFromExecutionRecords,
   getCurrentExecutionStreak,
   getCurrentSleepStreak,
   GrowthDimension,
@@ -20,14 +14,7 @@ import {
   TrendBar,
   TrendPoint
 } from "@/utils/growth";
-
-type GrowthData = {
-  records: SleepRecord[];
-  executionRecords: DailyExecutionRecord[];
-  sessions: Record<string, RescueSession>;
-  reviews: TodayReview[];
-  config: UserConfig;
-};
+import { useResponsiveMetrics } from "@/utils/responsive";
 
 type MetricCardProps = {
   label: string;
@@ -337,6 +324,65 @@ function ChangeList({ title, rows }: { title: string; rows: { icon?: string; ima
   );
 }
 
+function isMeaningfulExecution(record: DailyExecutionRecord): boolean {
+  return record.status !== "not_started" || Boolean(record.readyToSleepAt || record.checkinCompletedAt || record.feedbackViewedAt);
+}
+
+function countGrowthSignals(
+  records: SleepRecord[],
+  executionRecords: DailyExecutionRecord[],
+  reviews: TodayReview[]
+): number {
+  return new Set([
+    ...records.map((record) => record.date),
+    ...executionRecords.filter(isMeaningfulExecution).map((record) => record.date),
+    ...reviews.map((review) => review.date)
+  ]).size;
+}
+
+function EmptyGrowthState() {
+  return (
+    <>
+      <HeroCopy
+        eyebrow="成长记录"
+        title="先留下第一个夜晚"
+        subtitle="完成一次睡前收尾或次日打卡后，这里就会开始生成属于你的变化。"
+      />
+      <GlassCard style={styles.emptyCard}>
+        <Text style={styles.emptyTitle}>现在还不用看数据</Text>
+        <Text style={styles.emptyBody}>第一条记录只负责建立基线。哪怕今晚只是写一句复盘、选一个助眠入口，也已经足够开始。</Text>
+      </GlassCard>
+      <GradientButton title="开始今晚自救" onPress={() => router.push("/rescue")} />
+    </>
+  );
+}
+
+function GrowthReadinessCard({
+  signalCount,
+  streak
+}: {
+  signalCount: number;
+  streak: number;
+}) {
+  const title = streak >= 3
+    ? `你已经连续 ${streak} 晚把自己带回来了`
+    : signalCount < 3
+      ? "正在建立你的夜晚基线"
+      : "你的变化已经开始有轮廓";
+  const body = streak >= 3
+    ? "连续性比单晚完美更重要。后面几张卡片会优先看见这个长期变化。"
+    : signalCount < 3
+      ? "现在数据还少，所以这里会少做判断，多保留事实。再积累几晚，趋势会更清楚。"
+      : "这里会把复盘、打卡和自救记录放在一起看，不再只看徽章或单次成败。";
+
+  return (
+    <GlassCard style={styles.readinessCard}>
+      <Text style={styles.readinessTitle}>{title}</Text>
+      <Text style={styles.readinessBody}>{body}</Text>
+    </GlassCard>
+  );
+}
+
 function WeekView({ stats, streak }: { stats: GrowthStats; streak: number }) {
   return (
     <>
@@ -459,25 +505,38 @@ function Content({
   dimension,
   stats,
   records,
-  executionRecords
+  executionRecords,
+  reviews
 }: {
   dimension: GrowthDimension;
   stats: GrowthStats;
   records: SleepRecord[];
   executionRecords: DailyExecutionRecord[];
+  reviews: TodayReview[];
 }) {
-  if (dimension === "month") {
-    return <MonthView stats={stats} />;
+  const streak = getCurrentExecutionStreak(executionRecords) || getCurrentSleepStreak(records);
+  const signalCount = countGrowthSignals(records, executionRecords, reviews);
+
+  if (signalCount === 0) {
+    return <EmptyGrowthState />;
   }
 
-  if (dimension === "all") {
-    return <AllView stats={stats} />;
-  }
+  const body = dimension === "month"
+    ? <MonthView stats={stats} />
+    : dimension === "all"
+      ? <AllView stats={stats} />
+      : <WeekView stats={stats} streak={streak} />;
 
-  return <WeekView stats={stats} streak={getCurrentExecutionStreak(executionRecords) || getCurrentSleepStreak(records)} />;
+  return (
+    <>
+      <GrowthReadinessCard signalCount={signalCount} streak={streak} />
+      {body}
+    </>
+  );
 }
 
 export default function RecordsScreen() {
+  const metrics = useResponsiveMetrics();
   const [data, setData] = useState<GrowthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dimension, setDimension] = useState<GrowthDimension>("week");
@@ -485,14 +544,7 @@ export default function RecordsScreen() {
   const [seeding, setSeeding] = useState(false);
 
   const reloadData = useCallback(async () => {
-    const [records, executionRecords, sessions, reviews, config] = await Promise.all([
-      getSleepRecords(),
-      getDailyExecutionRecords(),
-      getRescueSessions(),
-      getTodayReviews(),
-      getUserConfig()
-    ]);
-    setData({ records, executionRecords, sessions, reviews, config });
+    setData(await loadGrowthData());
     setLoading(false);
   }, []);
 
@@ -501,16 +553,10 @@ export default function RecordsScreen() {
       let active = true;
 
       async function load() {
-        const [records, executionRecords, sessions, reviews, config] = await Promise.all([
-          getSleepRecords(),
-          getDailyExecutionRecords(),
-          getRescueSessions(),
-          getTodayReviews(),
-          getUserConfig()
-        ]);
+        const nextData = await loadGrowthData();
 
         if (active) {
-          setData({ records, executionRecords, sessions, reviews, config });
+          setData(nextData);
           setLoading(false);
         }
       }
@@ -526,7 +572,7 @@ export default function RecordsScreen() {
     if (!data) {
       return null;
     }
-    return buildGrowthStatsFromExecutionRecords(data.executionRecords, data.records, data.sessions, data.reviews, data.config);
+    return buildGrowthStats(data);
   }, [data]);
 
   const changeDimension = (next: GrowthDimension) => {
@@ -550,22 +596,42 @@ export default function RecordsScreen() {
         <View style={styles.topGlow} />
         <View style={styles.sideGlow} />
       </View>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: metrics.bottomNavReservedSpace }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[
+            styles.content,
+            {
+              maxWidth: metrics.contentMaxWidth,
+              paddingHorizontal: metrics.contentHorizontalPadding,
+              paddingTop: metrics.contentTopPadding,
+              gap: metrics.contentGap
+            }
+          ]}
+        >
           <Header
             dimension={dimension}
             expanded={periodExpanded}
             onExpand={() => setPeriodExpanded(true)}
             onChange={changeDimension}
           />
-          <TestDataButton busy={seeding} onPress={addTestData} />
+          {isDemoMode ? <TestDataButton busy={seeding} onPress={addTestData} /> : null}
           {loading || !stats || !data ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color="#E6D5B8" />
               <Text style={styles.loadingText}>正在整理你的成长记录</Text>
             </View>
           ) : (
-            <Content dimension={dimension} stats={stats} records={data.records} executionRecords={data.executionRecords} />
+            <Content
+              dimension={dimension}
+              stats={stats}
+              records={data.records}
+              executionRecords={data.executionRecords}
+              reviews={data.reviews}
+            />
           )}
         </View>
       </ScrollView>
@@ -614,14 +680,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#151833"
   },
   scrollContent: {
-    paddingBottom: 142
+    flexGrow: 1
   },
   content: {
     width: "100%",
-    maxWidth: 430,
     alignSelf: "center",
-    paddingHorizontal: 23,
-    paddingTop: 18,
     gap: 14
   },
   topRow: {
@@ -755,6 +818,45 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.055)",
     overflow: "hidden"
   },
+  emptyCard: {
+    minHeight: 162,
+    padding: 24,
+    gap: 12,
+    borderColor: "rgba(230,213,184,0.28)",
+    backgroundColor: "rgba(230,213,184,0.08)"
+  },
+  emptyTitle: {
+    color: "#F5F6FF",
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: "900"
+  },
+  emptyBody: {
+    color: "#A6ABBF",
+    fontSize: 16,
+    lineHeight: 25,
+    fontWeight: "700"
+  },
+  readinessCard: {
+    minHeight: 112,
+    padding: 20,
+    gap: 8,
+    borderRadius: 24,
+    borderColor: "rgba(153,227,187,0.18)",
+    backgroundColor: "rgba(153,227,187,0.07)"
+  },
+  readinessTitle: {
+    color: "#DFF6E8",
+    fontSize: 19,
+    lineHeight: 26,
+    fontWeight: "900"
+  },
+  readinessBody: {
+    color: "#A6ABBF",
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "700"
+  },
   progressCard: {
     minHeight: 154,
     padding: 28,
@@ -855,10 +957,12 @@ const styles = StyleSheet.create({
   },
   circleGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 11
   },
   circleMetric: {
     flex: 1,
+    minWidth: 130,
     minHeight: 136,
     paddingVertical: 22,
     paddingHorizontal: 12,
@@ -900,10 +1004,12 @@ const styles = StyleSheet.create({
   },
   badgeGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12
   },
   badgeTile: {
     flex: 1,
+    minWidth: 150,
     minHeight: 114,
     padding: 16,
     flexDirection: "row",
@@ -1042,7 +1148,9 @@ const styles = StyleSheet.create({
     gap: 12
   },
   metricCard: {
-    width: "48.3%",
+    flexGrow: 1,
+    flexBasis: "47%",
+    minWidth: 138,
     minHeight: 138,
     padding: 22,
     justifyContent: "space-between"

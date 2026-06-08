@@ -1,17 +1,37 @@
 import { ReactNode } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
-
-const bottomNavReservedSpace = 124;
+import { useResponsiveMetrics } from "@/utils/responsive";
 
 type ScreenProps = {
   children: ReactNode;
   scroll?: boolean;
+  reserveBottomNav?: boolean;
+  contentStyle?: StyleProp<ViewStyle>;
 };
 
-export function Screen({ children, scroll = true }: ScreenProps) {
-  const content = <View style={styles.content}>{children}</View>;
+export function Screen({ children, scroll = true, reserveBottomNav = true, contentStyle }: ScreenProps) {
+  const metrics = useResponsiveMetrics();
+  const bottomSpace = reserveBottomNav ? metrics.bottomNavReservedSpace : Math.max(metrics.safeAreaBottom, 16);
+  const content = (
+    <View
+      style={[
+        styles.content,
+        {
+          maxWidth: metrics.contentMaxWidth,
+          paddingHorizontal: metrics.contentHorizontalPadding,
+          paddingTop: metrics.contentTopPadding,
+          paddingBottom: scroll ? metrics.contentBottomPadding : metrics.contentBottomPadding + bottomSpace,
+          gap: metrics.contentGap
+        },
+        !scroll && styles.contentStatic,
+        contentStyle
+      ]}
+    >
+      {children}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -22,7 +42,11 @@ export function Screen({ children, scroll = true }: ScreenProps) {
         <View style={styles.orbitFour} />
       </View>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomSpace }]}
+          showsVerticalScrollIndicator={false}
+        >
           {content}
         </ScrollView>
       ) : (
@@ -44,17 +68,14 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: bottomNavReservedSpace
+    flexGrow: 1
   },
   content: {
     width: "100%",
-    maxWidth: 430,
     alignSelf: "center",
-    paddingHorizontal: 24,
-    paddingTop: 26,
-    paddingBottom: 20,
-    gap: 20
+  },
+  contentStatic: {
+    flex: 1
   },
   orbitOne: {
     position: "absolute",

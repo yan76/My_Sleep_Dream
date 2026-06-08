@@ -1,24 +1,21 @@
-import { PermissionsAndroid, Platform } from "react-native";
+import { requestRecordingPermissionsAsync } from "expo-audio";
+import * as FileSystem from "expo-file-system";
 
 export type RecorderPermissionStatus = "granted" | "denied" | "unavailable";
 
 export async function requestSleepAudioPermission(): Promise<RecorderPermissionStatus> {
-  if (Platform.OS === "android") {
-    const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
-    return result === PermissionsAndroid.RESULTS.GRANTED ? "granted" : "denied";
+  try {
+    const permission = await requestRecordingPermissionsAsync();
+    return permission.granted || permission.status === "granted" ? "granted" : "denied";
+  } catch {
+    return "unavailable";
   }
-
-  if (Platform.OS === "ios") {
-    return "granted";
-  }
-
-  return "unavailable";
 }
 
-export async function startSleepAudioRecorder(): Promise<void> {
-  // Placeholder for the next iteration's expo-av recording implementation.
-}
+export async function deleteSleepAudioRecording(localAudioUri?: string): Promise<void> {
+  if (!localAudioUri) {
+    return;
+  }
 
-export async function stopSleepAudioRecorder(): Promise<void> {
-  // Placeholder for the next iteration's expo-av recording implementation.
+  await FileSystem.deleteAsync(localAudioUri, { idempotent: true }).catch(() => undefined);
 }

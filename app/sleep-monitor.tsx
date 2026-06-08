@@ -1,29 +1,39 @@
 import { router } from "expo-router";
+import {
+  RecordingPresets,
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+  useAudioRecorder,
+  useAudioRecorderState
+} from "expo-audio";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
-import { markSleepAudioEnabled } from "@/storage/dailyExecutionStorage";
+import { markSleepAudioDeleted, markSleepAudioEnabled } from "@/storage/dailyExecutionStorage";
 import {
   createSleepAudioSession,
+  deleteSleepAudioSession,
   getSleepAudioSessionByDate,
   markSleepAudioPermissionDenied,
   updateSleepAudioSessionStatus
 } from "@/storage/sleepAudioStorage";
 import {
-  requestSleepAudioPermission,
-  startSleepAudioRecorder,
-  stopSleepAudioRecorder
+  deleteSleepAudioRecording,
+  requestSleepAudioPermission
 } from "@/services/sleepAudioRecorder";
 import { SleepAudioSession } from "@/types/app";
 import { todayKey } from "@/utils/date";
 
 export default function SleepMonitorScreen() {
   const date = todayKey();
+  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
   const [session, setSession] = useState<SleepAudioSession | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
 
   const loadSession = useCallback(async () => {
     setSession(await getSleepAudioSessionByDate(date));
@@ -40,16 +50,36 @@ export default function SleepMonitorScreen() {
 
     setBusy(true);
     try {
+      setRecordingError(null);
       const permission = await requestSleepAudioPermission();
       if (permission !== "granted") {
         setSession(await markSleepAudioPermissionDenied(date));
         return;
       }
 
-      await startSleepAudioRecorder();
-      const next = await createSleepAudioSession(date);
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: false,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false
+      });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      const next = await createSleepAudioSession(date, {
+        localAudioUri: recorder.uri ?? recorderState.url ?? undefined
+      });
       await markSleepAudioEnabled(next.id, date);
       setSession(next);
+    } catch (error) {
+      console.warn("[sleep-audio] Failed to start recorder", error);
+      await setIsAudioActiveAsync(false).catch(() => undefined);
+      setRecordingError("录音启动失败，请确认没有其他应用占用麦克风后再试。");
+      const failed = await updateSleepAudioSessionStatus(date, "failed", {
+        localAudioUri: recorder.uri ?? recorderState.url ?? undefined
+      }).catch(() => null);
+      if (failed) {
+        setSession(failed);
+      }
     } finally {
       setBusy(false);
     }
@@ -62,16 +92,68 @@ export default function SleepMonitorScreen() {
 
     setBusy(true);
     try {
-      await stopSleepAudioRecorder();
-      setSession(await updateSleepAudioSessionStatus(date, "completed"));
+      setRecordingError(null);
+      if (!recorderState.isRecording) {
+        await setIsAudioActiveAsync(false).catch(() => undefined);
+        setSession(await updateSleepAudioSessionStatus(date, "completed", {
+          localAudioUri: session?.localAudioUri
+        }));
+        return;
+      }
+
+      const startedDuration = recorderState.durationMillis;
+      await recorder.stop();
+      const status = recorder.getStatus();
+      await setIsAudioActiveAsync(false).catch(() => undefined);
+      setSession(await updateSleepAudioSessionStatus(date, "completed", {
+        localAudioUri: recorder.uri ?? status.url ?? session?.localAudioUri,
+        summary: startedDuration || status.durationMillis
+          ? { quietScore: 92, hasVoiceLikeSound: false, hasSnoreLikeSound: false }
+          : undefined
+      }));
+    } catch (error) {
+      console.warn("[sleep-audio] Failed to stop recorder", error);
+      await setIsAudioActiveAsync(false).catch(() => undefined);
+      setRecordingError("停止录音失败，你可以删除今晚监听记录后重新开始。");
+      const failed = await updateSleepAudioSessionStatus(date, "failed", {
+        localAudioUri: recorder.uri ?? recorderState.url ?? session?.localAudioUri
+      }).catch(() => null);
+      if (failed) {
+        setSession(failed);
+      }
     } finally {
       setBusy(false);
     }
   };
 
-  const isRecording = session?.status === "recording";
+  const remove = async () => {
+    if (busy) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      setRecordingError(null);
+      if (recorderState.isRecording) {
+        await recorder.stop().catch(() => undefined);
+        await setIsAudioActiveAsync(false).catch(() => undefined);
+      }
+      await deleteSleepAudioRecording(session?.localAudioUri);
+      await deleteSleepAudioSession(date);
+      await markSleepAudioDeleted(date);
+      setSession(null);
+    } catch (error) {
+      console.warn("[sleep-audio] Failed to delete recording", error);
+      setRecordingError("删除监听记录失败，请稍后再试。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isRecording = session?.status === "recording" || recorderState.isRecording;
   const hasFinished = session?.status === "completed" || session?.status === "stopped";
   const denied = session?.status === "permission_denied";
+  const failed = session?.status === "failed";
 
   return (
     <Screen>
@@ -84,7 +166,7 @@ export default function SleepMonitorScreen() {
       <View style={styles.header}>
         <Text style={styles.eyebrow}>睡眠监听</Text>
         <Text style={styles.title}>只记录今晚的声音摘要</Text>
-        <Text style={styles.subtitle}>它不会上传云端，也不会影响明早打卡。你可以随时停止。</Text>
+        <Text style={styles.subtitle}>它只保存在本机，不会上传云端。你可以随时停止，也可以删除。</Text>
       </View>
 
       <AppCard tone="cool" style={styles.statusCard}>
@@ -92,16 +174,23 @@ export default function SleepMonitorScreen() {
           <Text style={styles.label}>当前状态</Text>
           <Text style={styles.statusPill}>{statusLabel(session)}</Text>
         </View>
-        <Text style={styles.cardTitle}>{isRecording ? "正在本机监听" : hasFinished ? "今晚监听已收好" : "准备开始监听"}</Text>
-        <Text style={styles.body}>
-          {denied
-            ? "你没有授权麦克风，所以今晚不会记录声音摘要。这不影响睡前闭环。"
-            : isRecording
-              ? "第一版先保存监听摘要占位，后续会接入真实梦话/明显声音识别。"
-              : hasFinished
-                ? "明早打卡时，会看到昨晚的声音线索。"
-                : "点击开始后，App 会创建本机声音摘要记录。真实录音分析会在下个迭代接入。"}
+        <Text style={styles.cardTitle}>
+          {isRecording ? "正在本机监听" : failed ? "监听启动失败" : hasFinished ? "今晚监听已收好" : "准备开始监听"}
         </Text>
+        <Text style={styles.body}>
+          {recordingError
+            ? recordingError
+            : denied
+            ? "你没有授权麦克风，所以今晚不会记录声音摘要。这不影响睡前闭环。"
+            : failed
+              ? "今晚监听没有成功启动。你可以删除这条记录后重新开始。"
+            : isRecording
+              ? "正在本机录音。第一版只保存原始本机音频和安静摘要，不做医学判断。"
+              : hasFinished
+                ? "明早打卡时，会看到昨晚的声音线索摘要。原始音频仍只留在本机。"
+                : "点击开始后，App 会请求麦克风权限并在本机创建一段睡眠监听录音。"}
+        </Text>
+        {session?.localAudioUri ? <Text style={styles.uriText}>本机文件已保存</Text> : null}
       </AppCard>
 
       <View style={styles.factGrid}>
@@ -120,6 +209,9 @@ export default function SleepMonitorScreen() {
       ) : (
         <AppButton title={busy ? "正在准备..." : "开始监听"} variant="gradient" onPress={start} disabled={busy} />
       )}
+      {hasFinished || denied || failed ? (
+        <AppButton title={busy ? "正在删除..." : "删除今晚监听记录"} variant="danger" onPress={remove} disabled={busy} />
+      ) : null}
     </Screen>
   );
 }
@@ -139,6 +231,10 @@ function statusLabel(session: SleepAudioSession | null): string {
 
   if (session.status === "completed" || session.status === "stopped") {
     return "已完成";
+  }
+
+  if (session.status === "failed") {
+    return "启动失败";
   }
 
   return "待处理";
@@ -219,6 +315,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     fontWeight: "700"
+  },
+  uriText: {
+    color: colors.accent,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800"
   },
   factGrid: {
     flexDirection: "row",

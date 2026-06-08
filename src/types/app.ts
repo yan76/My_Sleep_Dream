@@ -15,7 +15,7 @@ export type SleepAidPreference =
   | "white_noise"
   | "asmr";
 
-export type DailyExecutionStatus =
+export type DailyCycleStatus =
   | "not_started"
   | "ritual_started"
   | "external_closed"
@@ -23,7 +23,10 @@ export type DailyExecutionStatus =
   | "sleep_aid_started"
   | "ready_to_sleep"
   | "needs_checkin"
-  | "checked_in";
+  | "checked_in"
+  | "feedback_viewed";
+
+export type DailyExecutionStatus = DailyCycleStatus;
 
 export type SleepResult = "near_target" | "slightly_late" | "very_late";
 
@@ -175,6 +178,7 @@ export type DailyExecutionRecord = {
   sleepAidStartedAt?: string;
   readyToSleepAt?: string;
   checkinCompletedAt?: string;
+  feedbackViewedAt?: string;
   usedSoundSpa: boolean;
   usedTreeHole: boolean;
   usedSleepGenerator: boolean;
@@ -189,6 +193,8 @@ export type DailyExecutionRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type DailyCycle = DailyExecutionRecord;
 
 export type SleepAudioSessionStatus =
   | "idle"
@@ -219,6 +225,7 @@ export type SleepAudioSession = {
   status: SleepAudioSessionStatus;
   startedAt?: string;
   stoppedAt?: string;
+  localAudioUri?: string;
   eventCount: number;
   events: SleepAudioEvent[];
   summary?: {
