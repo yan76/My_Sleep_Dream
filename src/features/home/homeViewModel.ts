@@ -14,6 +14,7 @@ export type HomeAction = {
   disabled?: boolean;
   startsSession?: boolean;
   demoCheckinDate?: string;
+  confirmsReadyToSleep?: boolean;
 };
 
 export type HomeViewModel = {
@@ -230,7 +231,7 @@ export function buildHomeState(data: HomeData): HomeViewModel {
         title: "我准备睡了",
         description: "如果已经放松下来，就把今晚停在这里。",
         buttonTitle: "我准备睡了",
-        href: "/bedtime"
+        confirmsReadyToSleep: true
       },
       ...recentChange
     };

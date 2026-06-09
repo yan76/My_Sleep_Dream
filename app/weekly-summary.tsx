@@ -6,11 +6,12 @@ import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { getDailyExecutionRecords } from "@/storage/dailyExecutionStorage";
 import {
+  getRescueSessions,
   getSleepRecords,
   getTodayReviews,
   getUserConfig
 } from "@/storage/rescueSessionStorage";
-import { DailyExecutionRecord, SleepRecord, TodayReview, UserConfig } from "@/types/app";
+import { DailyExecutionRecord, RescueSession, SleepRecord, TodayReview, UserConfig } from "@/types/app";
 import {
   createLocalWeeklySummary,
   generateWeeklySummary,
@@ -20,6 +21,7 @@ import {
 type WeeklySummaryData = {
   records: SleepRecord[];
   executionRecords: DailyExecutionRecord[];
+  sessions: Record<string, RescueSession>;
   reviews: TodayReview[];
   config: UserConfig;
 };
@@ -38,13 +40,15 @@ export default function WeeklySummaryScreen() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [records, executionRecords, reviews, config] = await Promise.all([
+    setResult(null);
+    const [records, executionRecords, sessions, reviews, config] = await Promise.all([
       getSleepRecords(),
       getDailyExecutionRecords(),
+      getRescueSessions(),
       getTodayReviews(),
       getUserConfig()
     ]);
-    const nextData = { records, executionRecords, reviews, config };
+    const nextData = { records, executionRecords, sessions, reviews, config };
     setData(nextData);
     setResult(createLocalWeeklySummary(nextData));
     setLoading(false);

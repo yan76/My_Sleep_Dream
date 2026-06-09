@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
+import { ReadyToSleepDialog } from "@/components/common/ReadyToSleepDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { markReadyToSleep, markSleepGeneratorUsed } from "@/storage/rescueSessionStorage";
@@ -54,6 +55,7 @@ export default function BedtimeScreen() {
   const [selectedId, setSelectedId] = useState(soundOptions[0].id);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [showReadyToSleepDialog, setShowReadyToSleepDialog] = useState(false);
 
   const stopCurrentPlayer = useCallback(() => {
     webAudioRef.current?.pause();
@@ -127,7 +129,7 @@ export default function BedtimeScreen() {
     }
   };
 
-  const readyToSleep = async () => {
+  const confirmReadyToSleep = async () => {
     if (isClosing) {
       return;
     }
@@ -139,6 +141,7 @@ export default function BedtimeScreen() {
         markReadyToSleep(),
         markExecutionReadyToSleep()
       ]);
+      setShowReadyToSleepDialog(false);
       router.replace("/rescue");
     } finally {
       setIsClosing(false);
@@ -189,11 +192,18 @@ export default function BedtimeScreen() {
         <AppButton
           title={isClosing ? "正在收尾..." : "我准备睡了"}
           variant="secondary"
-          onPress={readyToSleep}
+          onPress={() => setShowReadyToSleepDialog(true)}
           disabled={isClosing}
         />
         <AppButton title="回到自救流程" variant="ghost" onPress={() => router.replace("/rescue")} disabled={isClosing} />
       </View>
+
+      <ReadyToSleepDialog
+        visible={showReadyToSleepDialog}
+        confirming={isClosing}
+        onCancel={() => setShowReadyToSleepDialog(false)}
+        onConfirm={confirmReadyToSleep}
+      />
     </Screen>
   );
 }

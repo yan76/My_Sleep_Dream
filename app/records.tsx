@@ -266,12 +266,20 @@ function LineSegment({ from, to }: { from: { x: number; y: number }; to: { x: nu
   );
 }
 
+function clampChartValue(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function LineTrend({ title, range, points, compact = false }: { title: string; range: string; points: TrendPoint[]; compact?: boolean }) {
-  const chartWidth = 316;
+  const [chartWidth, setChartWidth] = useState(0);
   const chartHeight = compact ? 170 : 214;
+  const horizontalInset = compact ? 18 : 22;
+  const axisLabelWidth = 42;
+  const drawableWidth = Math.max(1, chartWidth - horizontalInset * 2);
+  const maxAxisLabelLeft = Math.max(0, chartWidth - axisLabelWidth);
   const maxValue = Math.max(1, ...points.map((point) => point.value));
   const coords = points.map((point, index) => {
-    const x = points.length === 1 ? 0 : (index / (points.length - 1)) * chartWidth;
+    const x = points.length === 1 ? chartWidth / 2 : horizontalInset + (index / (points.length - 1)) * drawableWidth;
     const y = chartHeight - 34 - (point.value / maxValue) * (chartHeight - 86);
     return { ...point, x, y };
   });
@@ -282,19 +290,47 @@ function LineTrend({ title, range, points, compact = false }: { title: string; r
         <Text style={styles.sectionTitle}>{title}</Text>
         <Text style={styles.goldSmall}>{range}</Text>
       </View>
-      <View style={[styles.lineChart, { height: chartHeight }]}>
-        <View style={styles.chartBaseLine} />
-        {coords.slice(0, -1).map((point, index) => (
-          <LineSegment key={`${point.label}-${coords[index + 1].label}`} from={point} to={coords[index + 1]} />
-        ))}
-        {coords.map((point, index) => (
-          <View key={point.label} style={[styles.lineDot, index === coords.length - 1 && styles.lineDotActive, { left: point.x - 6, top: point.y - 6 }]} />
-        ))}
-        {coords.map((point) => (
-          <Text key={`${point.label}-axis`} style={[styles.lineAxisLabel, { left: point.x - 18, top: chartHeight - 24 }]}>
-            {point.label}
-          </Text>
-        ))}
+      <View
+        style={[styles.lineChart, { height: chartHeight }]}
+        onLayout={({ nativeEvent }) => {
+          const nextWidth = Math.round(nativeEvent.layout.width);
+          if (nextWidth > 0 && nextWidth !== chartWidth) {
+            setChartWidth(nextWidth);
+          }
+        }}
+      >
+        <View style={[styles.chartBaseLine, { left: horizontalInset, right: horizontalInset }]} />
+        {chartWidth > 0 ? (
+          <>
+            {coords.slice(0, -1).map((point, index) => (
+              <LineSegment key={`${point.label}-${coords[index + 1].label}`} from={point} to={coords[index + 1]} />
+            ))}
+            {coords.map((point, index) => (
+              <View
+                key={point.label}
+                style={[
+                  styles.lineDot,
+                  index === coords.length - 1 && styles.lineDotActive,
+                  { left: point.x - 6, top: point.y - 6 }
+                ]}
+              />
+            ))}
+            {coords.map((point) => (
+              <Text
+                key={`${point.label}-axis`}
+                style={[
+                  styles.lineAxisLabel,
+                  {
+                    left: clampChartValue(point.x - axisLabelWidth / 2, 0, maxAxisLabelLeft),
+                    top: chartHeight - 24
+                  }
+                ]}
+              >
+                {point.label}
+              </Text>
+            ))}
+          </>
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -394,7 +430,7 @@ function WeekView({ stats, streak }: { stats: GrowthStats; streak: number }) {
       <ProgressCard stats={stats} />
       <WeekTrend bars={stats.weekBars} />
       <View style={styles.circleGrid}>
-        <CircleMetric label="复盘" value={String(Math.max(stats.reviewCount, streak))} caption="没有恐惧冻结更深夜" />
+        <CircleMetric label="复盘" value={String(stats.reviewCount)} caption="没有恐惧冻结更深夜" />
         <CircleMetric label="暂停" value={String(stats.pauseCount)} caption="想刷手机时停下来" />
         <CircleMetric label="不错" value={String(stats.goodMoodCount)} caption="睡来状态比较期待" />
       </View>

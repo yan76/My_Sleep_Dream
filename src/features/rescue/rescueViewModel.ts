@@ -44,27 +44,27 @@ function getStepState(
 ): StepState {
   const externalDone = dailyCycleAtLeast(executionRecord, "external_closed") || (session?.ritualStep ?? 0) >= 1;
   const reviewDone = dailyCycleAtLeast(executionRecord, "review_completed") || Boolean(session?.todayReviewCompleted);
-  const sleepDone =
+  const sleepAidStarted =
     dailyCycleAtLeast(executionRecord, "sleep_aid_started") ||
     Boolean(session?.sleepGeneratorUsed || session?.relaxModeUsed || session?.treeHoleUsed);
   const readyToSleep = dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep";
 
   if (id === "external") {
-    return externalDone || reviewDone || sleepDone || readyToSleep ? "done" : "active";
+    return externalDone || reviewDone || sleepAidStarted || readyToSleep ? "done" : "active";
   }
 
   if (id === "review") {
-    if (reviewDone || sleepDone || readyToSleep) {
+    if (reviewDone || sleepAidStarted || readyToSleep) {
       return "done";
     }
     return externalDone ? "active" : "locked";
   }
 
-  if (sleepDone || readyToSleep) {
+  if (readyToSleep) {
     return "done";
   }
 
-  return reviewDone ? "active" : "locked";
+  return sleepAidStarted || reviewDone ? "active" : "locked";
 }
 
 export function buildRescueViewModel(
@@ -122,12 +122,12 @@ export function buildRescueViewModel(
     session?.treeHoleUsed
   ) {
     return {
-      title: "睡意已经被请进来了",
-      subtitle: "现在不用努力睡着，只要别再把脑子重新点亮。",
+      title: "继续把睡意带近一点",
+      subtitle: "刚才已经开始降速了，现在可以继续完成进入睡意这一步。",
       statusLabel: "进入睡意",
-      primaryTitle: "把今晚收住",
-      primaryBody: "如果身体已经松下来，就把今晚停在这里。",
-      primaryButton: "我准备睡了",
+      primaryTitle: "进入睡意",
+      primaryBody: "继续选择声音 Spa、心理暗示或树洞。等真的准备好了，再在助眠页确认睡觉。",
+      primaryButton: "进入睡意",
       completed: false,
       steps
     };

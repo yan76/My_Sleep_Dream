@@ -15,9 +15,18 @@ type ChatMessage = {
 type WeeklySummaryRequest = {
   targetSleepTime?: string;
   wakeUpTime?: string;
+  metrics?: Partial<WeeklySummaryMetrics>;
   executionRecords?: Array<Record<string, unknown>>;
   sleepRecords?: Array<Record<string, unknown>>;
+  sessions?: Array<Record<string, unknown>> | Record<string, Record<string, unknown>>;
   reviews?: Array<Record<string, unknown>>;
+};
+
+type WeeklySummaryMetrics = {
+  completedCycleDays: number;
+  reviewDays: number;
+  pauseCount: number;
+  nearTargetDays: number;
 };
 
 type WeeklySummaryPayload = {
@@ -52,6 +61,113 @@ function reviewText(payload: WeeklySummaryRequest): string {
     ])
     .filter((value): value is string => typeof value === "string")
     .join("\n");
+}
+
+function uniqueDates(dates: string[]): Set<string> {
+  return new Set(dates.filter(Boolean));
+}
+
+function stringValue(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value : "";
+}
+
+function numberValue(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function booleanValue(record: Record<string, unknown>, key: string): boolean {
+  return Boolean(record[key]);
+}
+
+function sessionRecords(payload: WeeklySummaryRequest): Array<Record<string, unknown>> {
+  if (Array.isArray(payload.sessions)) {
+    return payload.sessions;
+  }
+
+  if (payload.sessions && typeof payload.sessions === "object") {
+    return Object.values(payload.sessions);
+  }
+
+  return [];
+}
+
+function completedExecution(record: Record<string, unknown>): boolean {
+  const status = stringValue(record, "status");
+  return Boolean(
+    record.readyToSleepAt ||
+      record.checkinCompletedAt ||
+      ["ready_to_sleep", "needs_checkin", "checked_in", "feedback_viewed"].includes(status)
+  );
+}
+
+function completedSession(record: Record<string, unknown>): boolean {
+  const status = stringValue(record, "status");
+  return Boolean(record.readyToSleepAt || ["ready_to_sleep", "completed"].includes(status));
+}
+
+function reviewedExecution(record: Record<string, unknown>): boolean {
+  const status = stringValue(record, "status");
+  return Boolean(
+    record.reviewCompletedAt ||
+      ["review_completed", "sleep_aid_started", "ready_to_sleep", "needs_checkin", "checked_in", "feedback_viewed"].includes(status)
+  );
+}
+
+function countCompletedCycleDates(payload: WeeklySummaryRequest): number {
+  return uniqueDates([
+    ...(payload.executionRecords ?? []).filter(completedExecution).map((record) => stringValue(record, "date")),
+    ...sessionRecords(payload).filter(completedSession).map((record) => stringValue(record, "date")),
+    ...(payload.sleepRecords ?? []).map((record) => stringValue(record, "date"))
+  ]).size;
+}
+
+function countReviewDates(payload: WeeklySummaryRequest): number {
+  return uniqueDates([
+    ...(payload.executionRecords ?? []).filter(reviewedExecution).map((record) => stringValue(record, "date")),
+    ...sessionRecords(payload).filter((record) => booleanValue(record, "todayReviewCompleted")).map((record) => stringValue(record, "date")),
+    ...(payload.reviews ?? []).map((review) => stringValue(review, "date"))
+  ]).size;
+}
+
+function countPauseActions(payload: WeeklySummaryRequest): number {
+  const executionByDate = new Map((payload.executionRecords ?? []).map((record) => [stringValue(record, "date"), record]));
+  const sessionByDate = new Map(sessionRecords(payload).map((record) => [stringValue(record, "date"), record]));
+  const dates = uniqueDates([...executionByDate.keys(), ...sessionByDate.keys()]);
+
+  return [...dates].reduce((sum, date) => {
+    const execution = executionByDate.get(date);
+    const session = sessionByDate.get(date);
+    const executionCount = execution ? numberValue(execution, "rescuePauseCount") + numberValue(execution, "shutdownChallengeCount") : 0;
+    const sessionCount = session && (booleanValue(session, "shutdownChallengeCompleted") || booleanValue(session, "hasUrgeToScroll")) ? 1 : 0;
+    return sum + Math.max(executionCount, sessionCount);
+  }, 0);
+}
+
+function countNearTargetDates(payload: WeeklySummaryRequest): number {
+  return uniqueDates([
+    ...(payload.executionRecords ?? [])
+      .filter((record) => stringValue(record, "sleepResult") === "near_target")
+      .map((record) => stringValue(record, "date")),
+    ...(payload.sleepRecords ?? [])
+      .filter((record) => booleanValue(record, "success"))
+      .map((record) => stringValue(record, "date"))
+  ]).size;
+}
+
+function numberMetric(metrics: Partial<WeeklySummaryMetrics> | undefined, key: keyof WeeklySummaryMetrics): number | undefined {
+  const value = metrics?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function resolveWeeklyMetrics(payload: WeeklySummaryRequest): WeeklySummaryMetrics {
+  return {
+    completedCycleDays: numberMetric(payload.metrics, "completedCycleDays") ?? countCompletedCycleDates(payload),
+    reviewDays: numberMetric(payload.metrics, "reviewDays") ?? countReviewDates(payload),
+    pauseCount: numberMetric(payload.metrics, "pauseCount") ?? countPauseActions(payload),
+    nearTargetDays: numberMetric(payload.metrics, "nearTargetDays") ?? countNearTargetDates(payload)
+  };
 }
 
 function getSafetyLabel(text: string): SafetyLabel {
@@ -93,23 +209,21 @@ function localFallbackSummary(payload: WeeklySummaryRequest, safetyLabel: Safety
     };
   }
 
-  const completedCount = (payload.executionRecords ?? []).filter((record) =>
-    Boolean(record.readyToSleepAt || record.checkinCompletedAt || record.status === "checked_in")
-  ).length;
-  const reviewCount = payload.reviews?.length ?? 0;
-  const sleepRecordCount = payload.sleepRecords?.length ?? 0;
-  const target = payload.targetSleepTime ?? "目标时间";
+  const metrics = resolveWeeklyMetrics(payload);
+  const completedCount = metrics.completedCycleDays;
+  const reviewCount = metrics.reviewDays;
+  const pauseCount = metrics.pauseCount;
 
   return {
     title: "本周晚安总结",
     summary:
-      completedCount > 0 || sleepRecordCount > 0
-        ? `这周你留下了 ${Math.max(completedCount, sleepRecordCount)} 个夜晚的记录。它们不一定每次都完美，但已经在帮身体重新学习“夜晚可以结束”。`
+      completedCount > 0
+        ? `这周你完成了 ${completedCount} 次睡前收尾。它们不一定每次都完美，但已经在帮身体重新学习“夜晚可以结束”。`
         : "这周的数据还不多，但只要开始记录，夜晚就不再是一团模糊的自责。先从一次很小的收尾开始。",
     highlights: [
+      completedCount > 0 ? `你完成了 ${completedCount} 次睡前收尾，让夜晚有了更清楚的结束。` : "睡前收尾记录还少，下周先完成一次最小闭环就很好。",
       reviewCount > 0 ? `你做了 ${reviewCount} 次复盘，把脑子里的事放到了屏幕外。` : "复盘记录还少，下周可以先写一句最占脑子的事。",
-      `目标时间先维持在 ${target}，不要急着加码。`,
-      "能完成最小闭环，比追求完美更重要。"
+      pauseCount > 0 ? `你有 ${pauseCount} 次在想继续刷时停了下来。` : "下次想继续刷时，只需要先暂停 2 分钟。"
     ],
     nextFocus: "提前 10 分钟开始收尾，只完成“收住外界、写一句、选一个助眠入口”这三个最小动作。"
   };
@@ -241,7 +355,7 @@ serve(async (request) => {
           {
             role: "system",
             content:
-              "你是早睡自救局的周总结生成器。只基于用户睡前行为和记录做温柔、具体、非评判总结。不要医疗诊断、治疗承诺或药物建议。只输出严格 JSON：{\"title\":\"...\",\"summary\":\"...\",\"highlights\":[\"...\"],\"nextFocus\":\"...\"}。"
+              "你是早睡自救局的周总结生成器。只基于用户睡前行为和记录做温柔、具体、非评判总结。必须直接使用 payload.metrics 中的 completedCycleDays（睡前收尾）、reviewDays（复盘）、pauseCount（停止刷手机）、nearTargetDays（接近目标时间），不要编造或改写这些数量。不要医疗诊断、治疗承诺或药物建议。只输出严格 JSON：{\"title\":\"...\",\"summary\":\"...\",\"highlights\":[\"...\"],\"nextFocus\":\"...\"}。"
           },
           {
             role: "user",
@@ -249,7 +363,7 @@ serve(async (request) => {
           }
         ]);
   const parsed = parseSummary(aiContent);
-  const summary = parsed ?? fallback;
+  const summary = parsed ? { ...parsed, highlights: fallback.highlights } : fallback;
 
   await supabase.from("ai_messages").insert({
     user_id: user.id,

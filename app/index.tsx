@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
+import { ReadyToSleepDialog } from "@/components/common/ReadyToSleepDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { buildHomeState, PRIMARY_TOOLS } from "@/features/home/homeViewModel";
@@ -14,12 +15,14 @@ import {
   getRescueSessions,
   getTodaySession,
   getUserConfig,
+  markReadyToSleep,
   startTodaySession
 } from "@/storage/rescueSessionStorage";
 import { getSleepAudioSessionByDate } from "@/storage/sleepAudioStorage";
 import {
   getDailyExecutionRecordByDate,
   markNeedsCheckin,
+  markReadyToSleep as markExecutionReadyToSleep,
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
 import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
@@ -77,6 +80,8 @@ export default function HomeScreen() {
   };
   const [data, setData] = useState<HomeData | null>(null);
   const [clock, setClock] = useState(nowTime());
+  const [showReadyToSleepDialog, setShowReadyToSleepDialog] = useState(false);
+  const [isConfirmingReadyToSleep, setIsConfirmingReadyToSleep] = useState(false);
   const reminderEnabled = useAppStore((state) => state.reminderSettings.enabled);
 
   const loadHomeData = useCallback(async () => {
@@ -145,6 +150,11 @@ export default function HomeScreen() {
       return;
     }
 
+    if (viewModel.action.confirmsReadyToSleep) {
+      setShowReadyToSleepDialog(true);
+      return;
+    }
+
     if (viewModel.action.startsSession) {
       await startTodaySession();
       await markRitualStarted();
@@ -157,6 +167,24 @@ export default function HomeScreen() {
 
     if (viewModel.action.href) {
       router.push(viewModel.action.href);
+    }
+  };
+
+  const confirmReadyToSleep = async () => {
+    if (isConfirmingReadyToSleep) {
+      return;
+    }
+
+    setIsConfirmingReadyToSleep(true);
+    try {
+      await Promise.all([
+        markReadyToSleep(),
+        markExecutionReadyToSleep()
+      ]);
+      setShowReadyToSleepDialog(false);
+      await loadHomeData();
+    } finally {
+      setIsConfirmingReadyToSleep(false);
     }
   };
 
@@ -348,6 +376,12 @@ export default function HomeScreen() {
         ))}
       </View>
 
+      <ReadyToSleepDialog
+        visible={showReadyToSleepDialog}
+        confirming={isConfirmingReadyToSleep}
+        onCancel={() => setShowReadyToSleepDialog(false)}
+        onConfirm={confirmReadyToSleep}
+      />
     </Screen>
   );
 }

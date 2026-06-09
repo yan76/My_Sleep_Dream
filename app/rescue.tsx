@@ -10,7 +10,6 @@ import type { FlowStep, RescueData } from "@/features/rescue/rescueViewModel";
 import {
   getTodaySession,
   getUserConfig,
-  markReadyToSleep,
   markUrgeToScroll,
   startTodaySession,
   updateTodayRitualStep
@@ -18,7 +17,6 @@ import {
 import {
   getDailyExecutionRecordByDate,
   markExternalClosed,
-  markReadyToSleep as markExecutionReadyToSleep,
   markRescuePause,
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
@@ -108,9 +106,7 @@ export default function RescueScreen() {
         session?.relaxModeUsed ||
         session?.treeHoleUsed
       ) {
-        await markReadyToSleep();
-        await markExecutionReadyToSleep();
-        await loadData();
+        router.push("/sleep-generator");
         return;
       }
 

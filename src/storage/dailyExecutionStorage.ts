@@ -58,6 +58,29 @@ async function readLegacyExecutionMap(): Promise<StoredDailyExecutionRecords> {
   }
 }
 
+function normalizeExecutionRecordMap(records: DailyExecutionRecord[]): StoredDailyExecutionRecords {
+  return Object.fromEntries(
+    records
+      .map(normalizeDailyCycleRecord)
+      .map((record) => [record.date, record])
+  );
+}
+
+async function writeLegacyExecutionRecord(record: DailyExecutionRecord): Promise<void> {
+  try {
+    const records = await readLegacyExecutionMap();
+    await appStorage.setItem(
+      storageKeys.dailyExecutionRecords,
+      JSON.stringify({
+        ...records,
+        [record.date]: record
+      })
+    );
+  } catch (error) {
+    console.warn("[storage] Failed to mirror daily execution record", error);
+  }
+}
+
 async function ensureLegacyDailyCyclesMigrated(): Promise<void> {
   if (legacyDailyCycleMigrationChecked) {
     return;
@@ -82,13 +105,17 @@ async function ensureLegacyDailyCyclesMigrated(): Promise<void> {
 
 async function readExecutionMap(): Promise<StoredDailyExecutionRecords> {
   await ensureLegacyDailyCyclesMigrated();
+  const legacyRecords = normalizeExecutionRecordMap(Object.values(await readLegacyExecutionMap()));
 
   try {
     const sqliteRecords = await getDailyCyclesFromSQLite();
-    return Object.fromEntries(sqliteRecords.map((record) => [record.date, normalizeDailyCycleRecord(record)]));
+    return {
+      ...legacyRecords,
+      ...normalizeExecutionRecordMap(sqliteRecords)
+    };
   } catch (error) {
     console.warn("[sqlite] Failed to read daily cycles", error);
-    return {};
+    return legacyRecords;
   }
 }
 
@@ -97,11 +124,16 @@ async function readExecutionRecord(date: string): Promise<DailyExecutionRecord |
 
   try {
     const record = await getDailyCycleFromSQLiteByDate(date);
-    return record ? normalizeDailyCycleRecord(record) : null;
+    if (record) {
+      return normalizeDailyCycleRecord(record);
+    }
   } catch (error) {
     console.warn("[sqlite] Failed to read daily cycle", error);
-    return null;
   }
+
+  const legacyRecords = await readLegacyExecutionMap();
+  const legacyRecord = legacyRecords[date];
+  return legacyRecord ? normalizeDailyCycleRecord(legacyRecord) : null;
 }
 
 async function createDefaultRecord(date: string): Promise<DailyExecutionRecord> {
@@ -120,6 +152,7 @@ async function persistExecutionRecord(
   const enqueueSync = options.enqueueSync ?? true;
 
   await upsertDailyCycleToSQLite(normalized, { syncStatus: options.syncStatus ?? (enqueueSync ? "pending" : "local_only") });
+  await writeLegacyExecutionRecord(normalized);
 
   if (enqueueSync) {
     await enqueueSyncItem({

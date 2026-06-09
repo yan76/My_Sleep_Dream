@@ -76,6 +76,14 @@ function reviewsInRange(reviews: TodayReview[], start: Date, end: Date): TodayRe
   return reviews.filter((review) => inRange(review.date, start, end));
 }
 
+function sessionPauseCount(session: RescueSession | undefined): number {
+  return session?.shutdownChallengeCompleted || session?.hasUrgeToScroll ? 1 : 0;
+}
+
+function executionPauseCount(record: DailyExecutionRecord, sessionsByDate: Record<string, RescueSession>): number {
+  return Math.max(record.rescuePauseCount + record.shutdownChallengeCount, sessionPauseCount(sessionsByDate[record.date]));
+}
+
 function normalizedSleepMinutes(time?: string): number | undefined {
   if (!time) {
     return undefined;
@@ -99,6 +107,14 @@ function timeFromIso(value?: string): string | undefined {
 
 function executionHasCompletedWindDown(record: DailyExecutionRecord): boolean {
   return Boolean(record.readyToSleepAt || record.checkinCompletedAt);
+}
+
+function executionHasCompletedCheckin(record: DailyExecutionRecord): boolean {
+  return Boolean(record.checkinCompletedAt || record.status === "checked_in" || record.status === "feedback_viewed");
+}
+
+function executionHasGoodMorningMood(record: DailyExecutionRecord): boolean {
+  return executionHasCompletedCheckin(record) && (record.morningMood === "good" || record.morningMood === "okay");
 }
 
 function executionDateSet(records: DailyExecutionRecord[]): Set<string> {
@@ -134,8 +150,9 @@ function executionSleepRecords(
       actualSleepTime,
       success: record.sleepResult ? record.sleepResult === "near_target" : didMeetPlannedSleepTime(actualSleepTime, record.plannedSleepTime),
       reasonIfFailed: record.lateReason,
-      moodNextMorning:
-        record.morningMood === "good" ? "精神不错" : record.morningMood === "okay" ? "还可以" : undefined,
+      moodNextMorning: executionHasCompletedCheckin(record)
+        ? record.morningMood === "good" ? "精神不错" : record.morningMood === "okay" ? "还可以" : undefined
+        : undefined,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt
     });
@@ -360,6 +377,45 @@ function countStartBeforeTarget(sessions: RescueSession[], config: UserConfig): 
   }).length;
 }
 
+function hasReviewSignal(
+  date: string,
+  sessionsByDate: Record<string, RescueSession>,
+  reviewDates: Set<string>,
+  record?: DailyExecutionRecord
+): boolean {
+  return Boolean(record?.reviewCompletedAt || sessionsByDate[date]?.todayReviewCompleted || reviewDates.has(date));
+}
+
+function countReviewDates(
+  executionRecords: DailyExecutionRecord[],
+  sessionsByDate: Record<string, RescueSession>,
+  reviews: TodayReview[],
+  includeDate: (date: string) => boolean
+): number {
+  const reviewDates = new Set(reviews.map((review) => review.date));
+  const dates = new Set<string>();
+
+  executionRecords.forEach((record) => {
+    if (includeDate(record.date) && hasReviewSignal(record.date, sessionsByDate, reviewDates, record)) {
+      dates.add(record.date);
+    }
+  });
+
+  Object.values(sessionsByDate).forEach((session) => {
+    if (includeDate(session.date) && session.todayReviewCompleted) {
+      dates.add(session.date);
+    }
+  });
+
+  reviews.forEach((review) => {
+    if (includeDate(review.date)) {
+      dates.add(review.date);
+    }
+  });
+
+  return dates.size;
+}
+
 function createFourWeekPoints(records: SleepRecord[], monthStart: Date): TrendPoint[] {
   return [0, 1, 2, 3].map((index) => {
     const start = addDays(monthStart, index * 7);
@@ -435,7 +491,7 @@ export function buildGrowthStats(
     monthAverageLabel: monthlyAverageCopy.averageLabel,
     monthStatusLabel: monthlyAverageCopy.statusLabel,
     reviewCount: weekReviews.length,
-    pauseCount: weekSessions.filter((session) => session.shutdownChallengeCompleted || session.hasUrgeToScroll).length,
+    pauseCount: weekSessions.reduce((sum, session) => sum + sessionPauseCount(session), 0),
     goodMoodCount: weeklyRecords.filter((record) => goodMoodLabels.has(record.moodNextMorning ?? "")).length,
     stableNightCount: monthlyRecords.filter((record) => record.success).length,
     cumulativeReviewCount: reviews.length,
@@ -472,21 +528,24 @@ export function buildGrowthStatsFromExecutionRecords(
   const legacySessions = Object.values(sessionsByDate).filter((session) => !executionDates.has(session.date));
   const legacyStats = buildGrowthStats(sleepRecords, Object.fromEntries(legacySessions.map((session) => [session.date, session])), legacyReviews, config);
   const weeklyPauseCount = weeklyExecutions.reduce(
-    (sum, record) => sum + record.rescuePauseCount + record.shutdownChallengeCount,
+    (sum, record) => sum + executionPauseCount(record, sessionsByDate),
     0
   );
   const monthlyCompletedCount = monthlyExecutions.filter(executionHasCompletedWindDown).length;
-  const weeklyGoodMoodCount = weeklyExecutions.filter((record) => record.morningMood === "good" || record.morningMood === "okay").length;
-  const weeklyReviewCount = weeklyExecutions.filter((record) => Boolean(record.reviewCompletedAt)).length;
-  const allReviewCount = executionRecords.filter((record) => Boolean(record.reviewCompletedAt)).length;
+  const weeklyGoodMoodCount = weeklyExecutions.filter(executionHasGoodMorningMood).length;
+  const weeklyLegacyGoodMoodCount = recordsInRange(legacyRecords, weekStart, weekEnd).filter((record) =>
+    goodMoodLabels.has(record.moodNextMorning ?? "")
+  ).length;
+  const weeklyReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, (date) => inRange(date, weekStart, weekEnd));
+  const allReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, () => true);
 
   return {
     ...legacyStats,
-    reviewCount: weeklyReviewCount + legacyStats.reviewCount,
+    reviewCount: weeklyReviewCount,
     pauseCount: weeklyPauseCount + legacyStats.pauseCount,
-    goodMoodCount: weeklyGoodMoodCount + legacyStats.goodMoodCount,
+    goodMoodCount: weeklyGoodMoodCount + weeklyLegacyGoodMoodCount,
     stableNightCount: monthlyCompletedCount + legacyStats.stableNightCount,
-    cumulativeReviewCount: allReviewCount + legacyReviews.length,
+    cumulativeReviewCount: allReviewCount,
     longestStreak: Math.max(countLongestExecutionStreak(executionRecords), legacyStats.longestStreak),
     startBeforeTargetCount: countExecutionStartBeforeTarget(monthlyExecutions.length ? monthlyExecutions : executionRecords, config) + legacyStats.startBeforeTargetCount,
     monthPoints: executionRecords.length ? createFourWeekExecutionPoints(executionRecords, monthStart) : legacyStats.monthPoints,
