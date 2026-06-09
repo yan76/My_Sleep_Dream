@@ -1,7 +1,8 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AppDialog } from "@/components/common/AppDialog";
 import { isDemoMode } from "@/constants/demo";
 import { buildGrowthStats, loadGrowthData, seedGrowthTestData } from "@/features/growth/growthData";
 import type { GrowthData } from "@/features/growth/growthData";
@@ -506,7 +507,7 @@ function AllView({ stats }: { stats: GrowthStats }) {
       />
       <View style={styles.metricGrid}>
         <MetricCard icon="▣" label="累计复盘" value={`${stats.cumulativeReviewCount} 次`} />
-        <MetricCard icon="☾" label="稳定晚数" value={`${stats.stableNightCount + stats.longestStreak} 晚`} />
+        <MetricCard icon="☾" label="稳定晚数" value={`${stats.allStableNightCount} 晚`} />
         <MetricCard icon="☺" label="精神不错" value={`${stats.goodMoodCount} 天`} />
         <MetricCard icon="♜" label="最长连胜" value={`${stats.longestStreak} 晚`} />
       </View>
@@ -542,15 +543,17 @@ function Content({
   stats,
   records,
   executionRecords,
-  reviews
+  reviews,
+  currentDate
 }: {
   dimension: GrowthDimension;
   stats: GrowthStats;
   records: SleepRecord[];
   executionRecords: DailyExecutionRecord[];
   reviews: TodayReview[];
+  currentDate: string;
 }) {
-  const streak = getCurrentExecutionStreak(executionRecords) || getCurrentSleepStreak(records);
+  const streak = getCurrentExecutionStreak(executionRecords, currentDate) || getCurrentSleepStreak(records, currentDate);
   const signalCount = countGrowthSignals(records, executionRecords, reviews);
 
   if (signalCount === 0) {
@@ -578,15 +581,29 @@ export default function RecordsScreen() {
   const [dimension, setDimension] = useState<GrowthDimension>("week");
   const [periodExpanded, setPeriodExpanded] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [showPendingWeekRolloverDialog, setShowPendingWeekRolloverDialog] = useState(false);
+  const pendingWeekRolloverPrompted = useRef(false);
+
+  const showPendingWeekRolloverPrompt = useCallback((nextData: GrowthData) => {
+    if (!nextData.hasPendingWeekRollover || pendingWeekRolloverPrompted.current) {
+      return;
+    }
+
+    pendingWeekRolloverPrompted.current = true;
+    setShowPendingWeekRolloverDialog(true);
+  }, []);
 
   const reloadData = useCallback(async () => {
-    setData(await loadGrowthData());
+    const nextData = await loadGrowthData();
+    setData(nextData);
     setLoading(false);
-  }, []);
+    showPendingWeekRolloverPrompt(nextData);
+  }, [showPendingWeekRolloverPrompt]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      pendingWeekRolloverPrompted.current = false;
 
       async function load() {
         const nextData = await loadGrowthData();
@@ -594,6 +611,7 @@ export default function RecordsScreen() {
         if (active) {
           setData(nextData);
           setLoading(false);
+          showPendingWeekRolloverPrompt(nextData);
         }
       }
 
@@ -601,7 +619,7 @@ export default function RecordsScreen() {
       return () => {
         active = false;
       };
-    }, [])
+    }, [showPendingWeekRolloverPrompt])
   );
 
   const stats = useMemo(() => {
@@ -667,10 +685,17 @@ export default function RecordsScreen() {
               records={data.records}
               executionRecords={data.executionRecords}
               reviews={data.reviews}
+              currentDate={data.currentDate}
             />
           )}
         </View>
       </ScrollView>
+      <AppDialog
+        visible={showPendingWeekRolloverDialog}
+        title="这一周已经完成啦~"
+        body={"请查收这一周的成果。\n当你开始新一周计划后，成长模块 - 本周页面会切换到新的周期哦"}
+        onConfirm={() => setShowPendingWeekRolloverDialog(false)}
+      />
     </SafeAreaView>
   );
 }

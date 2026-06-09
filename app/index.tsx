@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
+import { AppDialog } from "@/components/common/AppDialog";
 import { ReadyToSleepDialog } from "@/components/common/ReadyToSleepDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
@@ -16,7 +17,7 @@ import {
   getTodaySession,
   getUserConfig,
   markReadyToSleep,
-  startTodaySession
+  startTodaySessionWithNotice
 } from "@/storage/rescueSessionStorage";
 import { getSleepAudioSessionByDate } from "@/storage/sleepAudioStorage";
 import {
@@ -81,6 +82,7 @@ export default function HomeScreen() {
   const [data, setData] = useState<HomeData | null>(null);
   const [clock, setClock] = useState(nowTime());
   const [showReadyToSleepDialog, setShowReadyToSleepDialog] = useState(false);
+  const [newWeekStartedAction, setNewWeekStartedAction] = useState<(() => void) | null>(null);
   const [isConfirmingReadyToSleep, setIsConfirmingReadyToSleep] = useState(false);
   const reminderEnabled = useAppStore((state) => state.reminderSettings.enabled);
 
@@ -155,8 +157,11 @@ export default function HomeScreen() {
       return;
     }
 
+    let shouldShowNewWeekStartedPrompt = false;
+
     if (viewModel.action.startsSession) {
-      await startTodaySession();
+      const result = await startTodaySessionWithNotice();
+      shouldShowNewWeekStartedPrompt = result.startedNewGrowthWeek;
       await markRitualStarted();
       await loadHomeData();
     }
@@ -165,9 +170,26 @@ export default function HomeScreen() {
       await markNeedsCheckin(viewModel.action.demoCheckinDate);
     }
 
-    if (viewModel.action.href) {
-      router.push(viewModel.action.href);
+    const actionHref = viewModel.action.href;
+    if (actionHref) {
+      if (shouldShowNewWeekStartedPrompt) {
+        setNewWeekStartedAction(() => () => router.push(actionHref));
+        return;
+      }
+
+      router.push(actionHref);
+      return;
     }
+
+    if (shouldShowNewWeekStartedPrompt) {
+      setNewWeekStartedAction(() => () => undefined);
+    }
+  };
+
+  const confirmNewWeekStarted = () => {
+    const action = newWeekStartedAction;
+    setNewWeekStartedAction(null);
+    action?.();
   };
 
   const confirmReadyToSleep = async () => {
@@ -381,6 +403,12 @@ export default function HomeScreen() {
         confirming={isConfirmingReadyToSleep}
         onCancel={() => setShowReadyToSleepDialog(false)}
         onConfirm={confirmReadyToSleep}
+      />
+      <AppDialog
+        visible={newWeekStartedAction !== null}
+        title="新的一周开始了"
+        body="请继续加油！"
+        onConfirm={confirmNewWeekStarted}
       />
     </Screen>
   );

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
+import { AppDialog } from "@/components/common/AppDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { buildRescueViewModel } from "@/features/rescue/rescueViewModel";
@@ -11,7 +12,7 @@ import {
   getTodaySession,
   getUserConfig,
   markUrgeToScroll,
-  startTodaySession,
+  startTodaySessionWithNotice,
   updateTodayRitualStep
 } from "@/storage/rescueSessionStorage";
 import {
@@ -57,6 +58,7 @@ export default function RescueScreen() {
   const [data, setData] = useState<RescueData | null>(null);
   const [isWorking, setIsWorking] = useState(false);
   const [showExternalCloseDialog, setShowExternalCloseDialog] = useState(false);
+  const [newWeekStartedAction, setNewWeekStartedAction] = useState<(() => void) | null>(null);
 
   const loadData = useCallback(async () => {
     const cycleDate = await resolveCurrentCycleDate();
@@ -124,13 +126,20 @@ export default function RescueScreen() {
         return;
       }
 
-      const startedSession = session ?? (await startTodaySession());
+      const startResult = session
+        ? { session, startedNewGrowthWeek: false }
+        : await startTodaySessionWithNotice();
+      const startedSession = startResult.session;
       if (!dailyCycleAtLeast(executionRecord, "ritual_started")) {
         await markRitualStarted();
       }
 
       setData((current) => (current ? { ...current, session: startedSession } : current));
-      setShowExternalCloseDialog(true);
+      if (startResult.startedNewGrowthWeek) {
+        setNewWeekStartedAction(() => () => setShowExternalCloseDialog(true));
+      } else {
+        setShowExternalCloseDialog(true);
+      }
     } finally {
       setIsWorking(false);
     }
@@ -168,18 +177,31 @@ export default function RescueScreen() {
       const session = isInactiveSession(rawSession) ? null : rawSession;
       const executionRecord = isTerminalDailyCycle(rawExecutionRecord) ? null : rawExecutionRecord;
       const alreadyReadyToSleep = dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep";
+      let startedNewGrowthWeek = false;
 
       if (!alreadyReadyToSleep) {
-        await startTodaySession();
+        const startResult = await startTodaySessionWithNotice();
+        startedNewGrowthWeek = startResult.startedNewGrowthWeek;
         await markRitualStarted();
         await markRescuePause();
         await markUrgeToScroll();
+      }
+
+      if (startedNewGrowthWeek) {
+        setNewWeekStartedAction(() => () => router.push("/shutdown-challenge"));
+        return;
       }
 
       router.push("/shutdown-challenge");
     } finally {
       setIsWorking(false);
     }
+  };
+
+  const confirmNewWeekStarted = () => {
+    const action = newWeekStartedAction;
+    setNewWeekStartedAction(null);
+    action?.();
   };
 
   if (!data) {
@@ -283,6 +305,12 @@ export default function RescueScreen() {
           </View>
         </View>
       </Modal>
+      <AppDialog
+        visible={newWeekStartedAction !== null}
+        title="新的一周开始了"
+        body="请继续加油！"
+        onConfirm={confirmNewWeekStarted}
+      />
     </Screen>
   );
 }

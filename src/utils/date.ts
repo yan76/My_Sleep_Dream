@@ -16,6 +16,15 @@ export function addDays(date: Date, days: number): Date {
   return next;
 }
 
+export function startOfGrowthWeek(date = new Date()): Date {
+  const start = new Date(date);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
 export function isValidTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }

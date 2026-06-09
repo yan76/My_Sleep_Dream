@@ -8,6 +8,7 @@ import { TimePickerField } from "@/components/common/TimePickerField";
 import { colors } from "@/constants/colors";
 import { lateNightReasons } from "@/constants/reasons";
 import {
+  advanceDemoCycleDateAfterCompletedRecord,
   createOrUpdateSleepRecord,
   getMorningCheckInDate,
   getSleepRecordByDate,
@@ -112,6 +113,7 @@ export default function CheckinScreen() {
         moodNextMorning: moodLabelMap[morningMood],
         reasonIfFailed: lateReason
       });
+      await advanceDemoCycleDateAfterCompletedRecord(date);
       router.replace({ pathname: "/review", params: { date } });
     } finally {
       setSaving(false);

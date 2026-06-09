@@ -9,6 +9,7 @@ export const storageKeys = {
   aiGeneratedOutputs: "my-sleep-dream:ai-generated-outputs",
   sqliteMigrationVersion: "my-sleep-dream:sqlite-migration-version",
   demoActiveCycleDate: "my-sleep-dream:demo-active-cycle-date",
+  demoPendingWeekRollover: "my-sleep-dream:demo-pending-week-rollover",
   localReminderNotificationId: "my-sleep-dream:local-reminder-notification-id",
   localReminderSnapshot: "my-sleep-dream:local-reminder-snapshot",
   appEvents: "my-sleep-dream:app-events"

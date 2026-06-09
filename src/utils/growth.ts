@@ -1,5 +1,5 @@
 import { DailyExecutionRecord, RescueSession, SleepRecord, TodayReview, UserConfig } from "@/types/app";
-import { addDays, todayKey, timeToMinutes } from "@/utils/date";
+import { addDays, startOfGrowthWeek, todayKey, timeToMinutes } from "@/utils/date";
 
 export type GrowthDimension = "week" | "month" | "all";
 
@@ -25,6 +25,7 @@ export type GrowthStats = {
   pauseCount: number;
   goodMoodCount: number;
   stableNightCount: number;
+  allStableNightCount: number;
   cumulativeReviewCount: number;
   longestStreak: number;
   lessLateCount: number;
@@ -37,13 +38,8 @@ export type GrowthStats = {
 const goodMoodLabels = new Set(["精神不错", "还可以"]);
 const dayLabels = ["一", "二", "三", "四", "五", "六", "日"];
 
-function startOfWeek(date: Date): Date {
-  const next = new Date(date);
-  const day = next.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  next.setDate(next.getDate() + diff);
-  next.setHours(0, 0, 0, 0);
-  return next;
+function dateFromKey(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00`);
 }
 
 function startOfMonth(date: Date): Date {
@@ -80,6 +76,13 @@ function sessionPauseCount(session: RescueSession | undefined): number {
   return session?.shutdownChallengeCompleted || session?.hasUrgeToScroll ? 1 : 0;
 }
 
+function sessionHasCompletedRescuePlan(session: RescueSession): boolean {
+  return Boolean(
+    session.readyToSleepAt ||
+      session.status === "ready_to_sleep"
+  );
+}
+
 function executionPauseCount(record: DailyExecutionRecord, sessionsByDate: Record<string, RescueSession>): number {
   return Math.max(record.rescuePauseCount + record.shutdownChallengeCount, sessionPauseCount(sessionsByDate[record.date]));
 }
@@ -107,6 +110,14 @@ function timeFromIso(value?: string): string | undefined {
 
 function executionHasCompletedWindDown(record: DailyExecutionRecord): boolean {
   return Boolean(record.readyToSleepAt || record.checkinCompletedAt);
+}
+
+function executionHasCompletedRescuePlan(record: DailyExecutionRecord): boolean {
+  return Boolean(
+    record.readyToSleepAt ||
+      record.status === "ready_to_sleep" ||
+      record.status === "needs_checkin"
+  );
 }
 
 function executionHasCompletedCheckin(record: DailyExecutionRecord): boolean {
@@ -200,9 +211,10 @@ function mergeSessionSleepRecords(
   return [...records, ...sessionRecords].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function countExecutionStreak(records: DailyExecutionRecord[]): number {
+function countExecutionStreak(records: DailyExecutionRecord[], currentDate = todayKey()): number {
   const completedDates = new Set(records.filter(executionHasCompletedWindDown).map((record) => record.date));
-  let cursor = completedDates.has(todayKey()) ? new Date() : addDays(new Date(), -1);
+  const current = dateFromKey(currentDate);
+  let cursor = completedDates.has(currentDate) ? current : addDays(current, -1);
   let count = 0;
 
   for (let index = 0; index < 365; index += 1) {
@@ -312,9 +324,10 @@ function formatAverageDelta(delta?: number): Pick<GrowthStats, "averageLabel" | 
   };
 }
 
-function countCurrentStreak(records: SleepRecord[]): number {
+function countCurrentStreak(records: SleepRecord[], currentDate = todayKey()): number {
   const successDates = new Set(records.filter((record) => record.success).map((record) => record.date));
-  let cursor = successDates.has(todayKey()) ? new Date() : addDays(new Date(), -1);
+  const current = dateFromKey(currentDate);
+  let cursor = successDates.has(currentDate) ? current : addDays(current, -1);
   let count = 0;
 
   for (let index = 0; index < 365; index += 1) {
@@ -416,6 +429,43 @@ function countReviewDates(
   return dates.size;
 }
 
+function countCompletedRescuePlanDates({
+  executionRecords = [],
+  sessionsByDate,
+  legacySleepRecords = [],
+  includeDate
+}: {
+  executionRecords?: DailyExecutionRecord[];
+  sessionsByDate: Record<string, RescueSession>;
+  legacySleepRecords?: SleepRecord[];
+  includeDate: (date: string) => boolean;
+}): number {
+  const dates = new Set<string>();
+  const coveredDates = new Set<string>();
+
+  executionRecords.forEach((record) => {
+    coveredDates.add(record.date);
+    if (includeDate(record.date) && executionHasCompletedRescuePlan(record)) {
+      dates.add(record.date);
+    }
+  });
+
+  Object.values(sessionsByDate).forEach((session) => {
+    coveredDates.add(session.date);
+    if (includeDate(session.date) && sessionHasCompletedRescuePlan(session)) {
+      dates.add(session.date);
+    }
+  });
+
+  legacySleepRecords.forEach((record) => {
+    if (includeDate(record.date) && !coveredDates.has(record.date) && record.success) {
+      dates.add(record.date);
+    }
+  });
+
+  return dates.size;
+}
+
 function createFourWeekPoints(records: SleepRecord[], monthStart: Date): TrendPoint[] {
   return [0, 1, 2, 3].map((index) => {
     const start = addDays(monthStart, index * 7);
@@ -443,12 +493,13 @@ export function buildGrowthStats(
   records: SleepRecord[],
   sessionsByDate: Record<string, RescueSession>,
   reviews: TodayReview[],
-  config: UserConfig
+  config: UserConfig,
+  currentDate = todayKey()
 ): GrowthStats {
   const sessions = Object.values(sessionsByDate);
   const sleepRecords = mergeSessionSleepRecords(records, sessions, config);
-  const now = new Date();
-  const weekStart = startOfWeek(now);
+  const now = dateFromKey(currentDate);
+  const weekStart = startOfGrowthWeek(now);
   const weekEnd = addDays(weekStart, 6);
   const previousWeekStart = addDays(weekStart, -7);
   const previousWeekEnd = addDays(weekStart, -1);
@@ -475,6 +526,16 @@ export function buildGrowthStats(
   const weekSessions = sessionsInRange(sessions, weekStart, weekEnd);
   const monthSessions = sessionsInRange(sessions, monthStart, monthEnd);
   const weekReviews = reviewsInRange(reviews, weekStart, weekEnd);
+  const stableNightCount = countCompletedRescuePlanDates({
+    sessionsByDate,
+    legacySleepRecords: records,
+    includeDate: (date) => inRange(date, monthStart, monthEnd)
+  });
+  const allStableNightCount = countCompletedRescuePlanDates({
+    sessionsByDate,
+    legacySleepRecords: records,
+    includeDate: () => true
+  });
   const previousFailures = previousMonthlyRecords.filter((record) => !record.success).length;
   const monthFailures = monthlyRecords.filter((record) => !record.success).length;
   const allFailures = sleepRecords.filter((record) => !record.success).length;
@@ -493,7 +554,8 @@ export function buildGrowthStats(
     reviewCount: weekReviews.length,
     pauseCount: weekSessions.reduce((sum, session) => sum + sessionPauseCount(session), 0),
     goodMoodCount: weeklyRecords.filter((record) => goodMoodLabels.has(record.moodNextMorning ?? "")).length,
-    stableNightCount: monthlyRecords.filter((record) => record.success).length,
+    stableNightCount,
+    allStableNightCount,
     cumulativeReviewCount: reviews.length,
     longestStreak: countLongestStreak(sleepRecords),
     lessLateCount: Math.max(0, previousFailures - monthFailures, firstMonthFailures - allFailures),
@@ -509,10 +571,11 @@ export function buildGrowthStatsFromExecutionRecords(
   legacySleepRecords: SleepRecord[],
   sessionsByDate: Record<string, RescueSession>,
   reviews: TodayReview[],
-  config: UserConfig
+  config: UserConfig,
+  currentDate = todayKey()
 ): GrowthStats {
-  const now = new Date();
-  const weekStart = startOfWeek(now);
+  const now = dateFromKey(currentDate);
+  const weekStart = startOfGrowthWeek(now);
   const weekEnd = addDays(weekStart, 6);
   const monthStart = startOfMonth(now);
   const monthEnd = addDays(addMonths(monthStart, 1), -1);
@@ -526,25 +589,37 @@ export function buildGrowthStatsFromExecutionRecords(
   const monthlyExecutions = executionRecords.filter((record) => inRange(record.date, monthStart, monthEnd));
   const legacyReviews = reviews.filter((review) => !executionDates.has(review.date));
   const legacySessions = Object.values(sessionsByDate).filter((session) => !executionDates.has(session.date));
-  const legacyStats = buildGrowthStats(sleepRecords, Object.fromEntries(legacySessions.map((session) => [session.date, session])), legacyReviews, config);
+  const legacyStats = buildGrowthStats(sleepRecords, Object.fromEntries(legacySessions.map((session) => [session.date, session])), legacyReviews, config, currentDate);
   const weeklyPauseCount = weeklyExecutions.reduce(
     (sum, record) => sum + executionPauseCount(record, sessionsByDate),
     0
   );
-  const monthlyCompletedCount = monthlyExecutions.filter(executionHasCompletedWindDown).length;
   const weeklyGoodMoodCount = weeklyExecutions.filter(executionHasGoodMorningMood).length;
   const weeklyLegacyGoodMoodCount = recordsInRange(legacyRecords, weekStart, weekEnd).filter((record) =>
     goodMoodLabels.has(record.moodNextMorning ?? "")
   ).length;
   const weeklyReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, (date) => inRange(date, weekStart, weekEnd));
   const allReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, () => true);
+  const stableNightCount = countCompletedRescuePlanDates({
+    executionRecords,
+    sessionsByDate,
+    legacySleepRecords: legacyRecords,
+    includeDate: (date) => inRange(date, monthStart, monthEnd)
+  });
+  const allStableNightCount = countCompletedRescuePlanDates({
+    executionRecords,
+    sessionsByDate,
+    legacySleepRecords: legacyRecords,
+    includeDate: () => true
+  });
 
   return {
     ...legacyStats,
     reviewCount: weeklyReviewCount,
     pauseCount: weeklyPauseCount + legacyStats.pauseCount,
     goodMoodCount: weeklyGoodMoodCount + weeklyLegacyGoodMoodCount,
-    stableNightCount: monthlyCompletedCount + legacyStats.stableNightCount,
+    stableNightCount,
+    allStableNightCount,
     cumulativeReviewCount: allReviewCount,
     longestStreak: Math.max(countLongestExecutionStreak(executionRecords), legacyStats.longestStreak),
     startBeforeTargetCount: countExecutionStartBeforeTarget(monthlyExecutions.length ? monthlyExecutions : executionRecords, config) + legacyStats.startBeforeTargetCount,
@@ -553,10 +628,10 @@ export function buildGrowthStatsFromExecutionRecords(
   };
 }
 
-export function getCurrentSleepStreak(records: SleepRecord[]): number {
-  return countCurrentStreak(records);
+export function getCurrentSleepStreak(records: SleepRecord[], currentDate = todayKey()): number {
+  return countCurrentStreak(records, currentDate);
 }
 
-export function getCurrentExecutionStreak(records: DailyExecutionRecord[]): number {
-  return countExecutionStreak(records);
+export function getCurrentExecutionStreak(records: DailyExecutionRecord[], currentDate = todayKey()): number {
+  return countExecutionStreak(records, currentDate);
 }

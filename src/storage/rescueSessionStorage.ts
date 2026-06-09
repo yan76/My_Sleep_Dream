@@ -4,8 +4,11 @@ import { storageKeys } from "@/storage/storageKeys";
 import { defaultSleepAidPreferences } from "@/constants/sleepAidPreferences";
 import {
   clearStoredDemoCycleDate,
+  findFirstAvailableDemoDate,
   resolveCurrentCycleDate,
-  resolveDemoStartCycleDate
+  resolveDemoStartCycleDateWithNotice,
+  setDemoPendingWeekRollover,
+  setStoredDemoCycleDate
 } from "@/storage/demoCycleDateStorage";
 import { clearSleepAudioSessions } from "@/storage/sleepAudioStorage";
 import {
@@ -36,7 +39,7 @@ import {
   TodayReview,
   UserConfig
 } from "@/types/app";
-import { addDays, timeToMinutes, todayKey } from "@/utils/date";
+import { addDays, startOfGrowthWeek, timeToMinutes, todayKey } from "@/utils/date";
 
 type StoredRescueSessions = Record<string, RescueSession>;
 type StoredSleepRecords = Record<string, SleepRecord>;
@@ -47,6 +50,15 @@ type SleepRecordInput = Partial<
   Pick<SleepRecord, "date" | "sessionId" | "plannedSleepTime" | "actualSleepTime" | "success" | "reasonIfFailed" | "moodNextMorning">
 >;
 type TodayReviewInput = Partial<Pick<TodayReview, "mood" | "happenedToday" | "completedToday" | "unfinishedToday" | "tomorrowPlan" | "affirmation" | "minimalMode">>;
+export type DemoCycleAdvanceNotice = {
+  nextDate: string;
+  crossedWeek: boolean;
+  crossedMonth: boolean;
+};
+export type StartTodaySessionResult = {
+  session: RescueSession;
+  startedNewGrowthWeek: boolean;
+};
 
 const DEFAULT_TARGET_SLEEP_TIME = "23:30";
 const DEFAULT_WAKE_UP_TIME = "07:30";
@@ -178,6 +190,14 @@ function dateTimeForDateKey(date: string, time: string): Date {
   return next;
 }
 
+function dateFromKey(date: string): Date {
+  return new Date(`${date}T00:00:00`);
+}
+
+function sameGrowthWeek(left: string, right: string): boolean {
+  return todayKey(startOfGrowthWeek(dateFromKey(left))) === todayKey(startOfGrowthWeek(dateFromKey(right)));
+}
+
 function wakeTimeForCycle(date: string, wakeUpTime: string, readyAtValue?: string): Date {
   const readyAt = readyAtValue ? new Date(readyAtValue) : null;
 
@@ -205,57 +225,6 @@ async function getDailyExecutionRecordMap(): Promise<StoredDailyExecutionRecords
   }
 
   return readJson<StoredDailyExecutionRecords>(storageKeys.dailyExecutionRecords, {});
-}
-
-function findNextGrowthTestDate(existingDates: Set<string>): string {
-  const now = new Date();
-  const weekDay = now.getDay() || 7;
-  const weekStart = addDays(now, 1 - weekDay);
-  const weekEnd = addDays(weekStart, 6);
-  const candidates: string[] = [];
-
-  for (let offset = 0; offset <= 6; offset += 1) {
-    const date = addDays(now, offset);
-    if (date <= weekEnd) {
-      candidates.push(todayKey(date));
-    }
-  }
-
-  for (let offset = -1; offset >= -6; offset -= 1) {
-    const date = addDays(now, offset);
-    if (date >= weekStart) {
-      candidates.push(todayKey(date));
-    }
-  }
-
-  for (let offset = 7; offset <= 30; offset += 1) {
-    const date = addDays(now, offset);
-    if (date.getMonth() === now.getMonth()) {
-      candidates.push(todayKey(date));
-    }
-  }
-
-  for (let offset = -7; offset >= -60; offset -= 1) {
-    const date = addDays(now, offset);
-    if (date.getMonth() === now.getMonth()) {
-      candidates.push(todayKey(date));
-    }
-  }
-
-  for (const date of candidates) {
-    if (!existingDates.has(date)) {
-      return date;
-    }
-  }
-
-  for (let offset = -61; offset >= -365; offset -= 1) {
-    const date = todayKey(addDays(now, offset));
-    if (!existingDates.has(date)) {
-      return date;
-    }
-  }
-
-  return todayKey(addDays(now, -existingDates.size - 1));
 }
 
 function recordsBetween(records: SleepRecord[], start: Date, end: Date): SleepRecord[] {
@@ -325,14 +294,29 @@ export async function getTodaySession(): Promise<RescueSession | null> {
   return session && !isInactiveSession(session) ? session : null;
 }
 
-export async function startTodaySession(): Promise<RescueSession> {
-  const sessions = await getRescueSessions();
-  const executionRecords = await getDailyExecutionRecordMap();
-  const date = await resolveDemoStartCycleDate({ sessions, executionRecords });
+export async function startTodaySessionWithNotice(): Promise<StartTodaySessionResult> {
+  const [sessions, executionRecords, records, reviews] = await Promise.all([
+    getRescueSessions(),
+    getDailyExecutionRecordMap(),
+    getSleepRecordMap(),
+    getTodayReviewMap()
+  ]);
+  const cycleResolution = await resolveDemoStartCycleDateWithNotice({
+    sessions,
+    executionRecords,
+    occupiedDates: [
+      ...Object.keys(records),
+      ...Object.keys(reviews)
+    ]
+  });
+  const { date } = cycleResolution;
   const current = sessions[date];
 
   if (current && !isInactiveSession(current)) {
-    return current;
+    return {
+      session: current,
+      startedNewGrowthWeek: cycleResolution.startedNewGrowthWeek
+    };
   }
 
   if (isInactiveSession(current)) {
@@ -350,7 +334,14 @@ export async function startTodaySession(): Promise<RescueSession> {
   };
 
   await writeJson(storageKeys.rescueSessions, { ...sessions, [date]: session });
-  return session;
+  return {
+    session,
+    startedNewGrowthWeek: cycleResolution.startedNewGrowthWeek
+  };
+}
+
+export async function startTodaySession(): Promise<RescueSession> {
+  return (await startTodaySessionWithNotice()).session;
 }
 
 export async function updateTodaySession(input: Partial<RescueSession>): Promise<RescueSession> {
@@ -598,6 +589,47 @@ export async function createOrUpdateSleepRecord(input: SleepRecordInput = {}): P
   return next;
 }
 
+export async function advanceDemoCycleDateAfterCompletedRecord(date: string): Promise<DemoCycleAdvanceNotice | null> {
+  if (!isDemoMode) {
+    return null;
+  }
+
+  const [records, sessions, reviews, executionRecords] = await Promise.all([
+    getSleepRecordMap(),
+    getRescueSessions(),
+    getTodayReviewMap(),
+    getDailyExecutionRecordMap()
+  ]);
+  const nextCandidate = todayKey(addDays(dateFromKey(date), 1));
+  const nextDate = findFirstAvailableDemoDate(
+    new Set([
+      ...Object.keys(records),
+      ...Object.keys(sessions),
+      ...Object.keys(reviews),
+      ...Object.keys(executionRecords),
+      date
+    ]),
+    nextCandidate
+  );
+  const crossedWeek = !sameGrowthWeek(date, nextDate);
+
+  if (crossedWeek) {
+    await setStoredDemoCycleDate(date);
+    await setDemoPendingWeekRollover({
+      completedWeekDate: date,
+      nextDate
+    });
+  } else {
+    await setStoredDemoCycleDate(nextDate);
+  }
+
+  return {
+    nextDate,
+    crossedWeek,
+    crossedMonth: date.slice(0, 7) !== nextDate.slice(0, 7)
+  };
+}
+
 export async function seedGrowthTestData(): Promise<void> {
   const [config, records, sessions, reviews, executionRecords] = await Promise.all([
     getUserConfig(),
@@ -617,7 +649,7 @@ export async function seedGrowthTestData(): Promise<void> {
     ...Object.keys(nextReviews),
     ...Object.keys(nextExecutionRecords)
   ]);
-  const date = findNextGrowthTestDate(existingDates);
+  const date = findFirstAvailableDemoDate(existingDates);
   const sessionId = sessionIdForDate(date);
   const dateStart = new Date(`${date}T00:00:00`);
   const ritualStartedAt = isoForDateTime(date, timeWithOffset(config.targetSleepTime, -60));
@@ -703,6 +735,26 @@ export async function seedGrowthTestData(): Promise<void> {
     replaceTodayReviewsInSQLite(Object.values(nextReviews)),
     replaceDailyCyclesInSQLite(Object.values(nextExecutionRecords))
   ]);
+
+  if (isDemoMode) {
+    const nextDate = findFirstAvailableDemoDate(
+      new Set([
+        ...existingDates,
+        date
+      ]),
+      todayKey(addDays(dateStart, 1))
+    );
+
+    if (sameGrowthWeek(date, nextDate)) {
+      await setStoredDemoCycleDate(nextDate);
+    } else {
+      await setStoredDemoCycleDate(date);
+      await setDemoPendingWeekRollover({
+        completedWeekDate: date,
+        nextDate
+      });
+    }
+  }
 }
 
 export async function getMorningCheckInDate(): Promise<string | null> {
