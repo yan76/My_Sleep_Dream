@@ -5,3 +5,16 @@
 expo-env.d.ts
 .expo/
 # @end expo-cli
+
+# Dependencies
+node_modules/
+
+# Expo / Metro generated output
+web-export/
+dist/
+
+# Local Codex / WorkBuddy runtime state
+.workbuddy/
+
+# Logs
+*.log
