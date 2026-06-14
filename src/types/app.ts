@@ -207,6 +207,8 @@ export type SleepAudioSessionStatus =
 export type SleepAudioEventType =
   | "voice_like"
   | "snore_like"
+  | "cough_like"
+  | "movement_like"
   | "noise_like"
   | "unknown";
 
@@ -217,6 +219,8 @@ export type SleepAudioEvent = {
   type: SleepAudioEventType;
   confidence?: number;
   localClipUri?: string;
+  peakDb?: number;
+  averageDb?: number;
 };
 
 export type SleepAudioSession = {
@@ -231,6 +235,16 @@ export type SleepAudioSession = {
   summary?: {
     hasVoiceLikeSound: boolean;
     hasSnoreLikeSound: boolean;
+    eventCount?: number;
+    voiceLikeCount?: number;
+    snoreLikeCount?: number;
+    coughLikeCount?: number;
+    movementLikeCount?: number;
+    noiseLikeCount?: number;
+    totalEventDurationMs?: number;
+    totalVoiceLikeDurationMs?: number;
+    totalSnoreLikeDurationMs?: number;
+    peakDb?: number;
     quietScore?: number;
   };
   createdAt: string;

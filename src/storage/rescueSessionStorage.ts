@@ -40,6 +40,7 @@ import {
   UserConfig
 } from "@/types/app";
 import { addDays, startOfGrowthWeek, timeToMinutes, todayKey } from "@/utils/date";
+import { dailyCycleIsReadyToSleepAfterReview } from "@/utils/dailyCycle";
 
 type StoredRescueSessions = Record<string, RescueSession>;
 type StoredSleepRecords = Record<string, SleepRecord>;
@@ -72,6 +73,30 @@ const DEFAULT_CLOSING_NOTE = "今天已经结束，剩下的交给明天。";
 
 function isInactiveSession(session: RescueSession | undefined): boolean {
   return Boolean(session && ["completed", "abandoned"].includes(session.status));
+}
+
+function hasSessionCompletedReview(session: RescueSession | null | undefined): boolean {
+  return Boolean(session?.todayReviewCompleted || session?.todayReviewCompletedAt);
+}
+
+function isSessionReadyToSleepAfterReview(session: RescueSession | null | undefined): boolean {
+  if (!session || !hasSessionCompletedReview(session)) {
+    return false;
+  }
+
+  if (session.readyToSleepAt) {
+    return session.todayReviewCompletedAt ? session.readyToSleepAt >= session.todayReviewCompletedAt : true;
+  }
+
+  return session.status === "ready_to_sleep";
+}
+
+async function canCompleteTodayRescueFlow(current?: RescueSession | null): Promise<boolean> {
+  if (hasSessionCompletedReview(current)) {
+    return true;
+  }
+
+  return Boolean(await getTodayReview());
 }
 
 function createDefaultUserConfig(): UserConfig {
@@ -397,14 +422,26 @@ export async function markShutdownChallengeCompleted(): Promise<RescueSession> {
   });
 }
 
-export async function markRelaxModeUsed(): Promise<RescueSession> {
+export async function markRelaxModeUsed(): Promise<RescueSession | null> {
+  const current = await getTodaySession();
+
+  if (!(await canCompleteTodayRescueFlow(current))) {
+    return current;
+  }
+
   return updateTodaySession({
     relaxModeUsed: true,
     status: "in_relax_mode"
   });
 }
 
-export async function markSleepGeneratorUsed(sleepAidChoice?: string): Promise<RescueSession> {
+export async function markSleepGeneratorUsed(sleepAidChoice?: string): Promise<RescueSession | null> {
+  const current = await getTodaySession();
+
+  if (!(await canCompleteTodayRescueFlow(current))) {
+    return current;
+  }
+
   return updateTodaySession({
     sleepGeneratorUsed: true,
     sleepAidChoice,
@@ -412,7 +449,13 @@ export async function markSleepGeneratorUsed(sleepAidChoice?: string): Promise<R
   });
 }
 
-export async function markTreeHoleUsed(): Promise<RescueSession> {
+export async function markTreeHoleUsed(): Promise<RescueSession | null> {
+  const current = await getTodaySession();
+
+  if (!(await canCompleteTodayRescueFlow(current))) {
+    return current;
+  }
+
   return updateTodaySession({
     treeHoleUsed: true,
     sleepAidChoice: "AI 树洞",
@@ -420,7 +463,15 @@ export async function markTreeHoleUsed(): Promise<RescueSession> {
   });
 }
 
+export async function canMarkReadyToSleep(): Promise<boolean> {
+  return canCompleteTodayRescueFlow(await getTodaySession());
+}
+
 export async function markReadyToSleep(): Promise<RescueSession> {
+  if (!(await canMarkReadyToSleep())) {
+    throw new Error("Cannot mark ready to sleep before completing today's rescue flow.");
+  }
+
   return updateTodaySessionStatus("ready_to_sleep");
 }
 
@@ -761,15 +812,16 @@ export async function getMorningCheckInDate(): Promise<string | null> {
   const now = new Date();
   const nowTime = now.getTime();
   const backfillWindowMs = 48 * 60 * 60 * 1000;
-  const [records, sessions, executionRecords] = await Promise.all([
+  const [records, sessions, executionRecords, reviews] = await Promise.all([
     getSleepRecordMap(),
     getRescueSessions(),
-    getDailyExecutionRecordMap()
+    getDailyExecutionRecordMap(),
+    getTodayReviewMap()
   ]);
 
   const executionCandidate = Object.values(executionRecords)
     .filter((record) => {
-      if (!["ready_to_sleep", "needs_checkin"].includes(record.status) || record.checkinCompletedAt) {
+      if (!dailyCycleIsReadyToSleepAfterReview(record) || record.checkinCompletedAt) {
         return false;
       }
 
@@ -789,7 +841,13 @@ export async function getMorningCheckInDate(): Promise<string | null> {
 
   const sessionCandidate = Object.values(sessions)
     .filter((session) => {
-      if (!["ready_to_sleep", "completed"].includes(session.status) || records[session.date]) {
+      const hasCompletedReview = hasSessionCompletedReview(session) || Boolean(reviews[session.date]);
+
+      if (
+        (!isSessionReadyToSleepAfterReview(session) && session.status !== "completed") ||
+        !hasCompletedReview ||
+        records[session.date]
+      ) {
         return false;
       }
 

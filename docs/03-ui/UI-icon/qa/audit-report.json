@@ -1,0 +1,192 @@
+﻿[
+  {
+    "path": "assets\\icons\\icon-dream-bed-05.png",
+    "width": 909,
+    "height": 1097,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 909,
+    "expected_height": 1097,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-book-02.png",
+    "width": 1005,
+    "height": 1186,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 1005,
+    "expected_height": 1186,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-cabin-01.png",
+    "width": 923,
+    "height": 1126,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 923,
+    "expected_height": 1126,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-check-sunrise-06.png",
+    "width": 914,
+    "height": 1104,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 914,
+    "expected_height": 1104,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-lunar-cycle-08.png",
+    "width": 1080,
+    "height": 1199,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 1080,
+    "expected_height": 1199,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-moon-orbit-04.png",
+    "width": 994,
+    "height": 1180,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 994,
+    "expected_height": 1180,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-moonscape-07.png",
+    "width": 953,
+    "height": 1131,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 953,
+    "expected_height": 1131,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-notes-09.png",
+    "width": 912,
+    "height": 1089,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 912,
+    "expected_height": 1089,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-path-03.png",
+    "width": 1053,
+    "height": 1121,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 1053,
+    "expected_height": 1121,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "assets\\icons\\icon-dream-sunrise-wand-10.png",
+    "width": 930,
+    "height": 1138,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 930,
+    "expected_height": 1138,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  }
+]

@@ -13,14 +13,9 @@ import {
 import { AppButton } from "@/components/common/AppButton";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
-import {
-  markReadyToSleep,
-  markTreeHoleUsed
-} from "@/storage/rescueSessionStorage";
-import {
-  markReadyToSleep as markExecutionReadyToSleep,
-  markSleepAidStarted
-} from "@/storage/dailyExecutionStorage";
+import { completeReadyToSleepAfterRescue } from "@/features/rescue/readyToSleepUseCase";
+import { markTreeHoleUsed } from "@/storage/rescueSessionStorage";
+import { markSleepAidStarted } from "@/storage/dailyExecutionStorage";
 import {
   sendTreeHoleMessage,
   TreeHoleMessage
@@ -122,8 +117,11 @@ export default function TreeHoleScreen() {
     setIsClosing(true);
     try {
       await markTreeHoleStarted();
-      await markReadyToSleep();
-      await markExecutionReadyToSleep();
+      const completed = await completeReadyToSleepAfterRescue();
+      if (!completed) {
+        router.replace("/rescue");
+        return;
+      }
       router.replace("/rescue");
     } finally {
       setIsClosing(false);

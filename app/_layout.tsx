@@ -24,7 +24,12 @@ function getActiveNav(pathname: string) {
     return "home";
   }
 
-  if (pathname.startsWith("/records") || pathname.startsWith("/weekly-summary")) {
+  if (
+    pathname.startsWith("/records") ||
+    pathname.startsWith("/weekly-summary") ||
+    pathname.startsWith("/journal") ||
+    pathname.startsWith("/badges")
+  ) {
     return "growth";
   }
 

@@ -165,5 +165,13 @@ export const localSchemaMigrations: LocalSchemaMigration[] = [
     sql: `
       alter table sync_queue add column last_error text;
     `
+  },
+  {
+    version: 3,
+    name: "extend_sleep_audio_events",
+    sql: `
+      alter table sleep_audio_events add column peak_db real;
+      alter table sleep_audio_events add column average_db real;
+    `
   }
 ];

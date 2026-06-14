@@ -22,7 +22,13 @@ import {
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
 import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
-import { dailyCycleAtLeast } from "@/utils/dailyCycle";
+import {
+  dailyCycleHasClosedExternal,
+  dailyCycleHasCompletedReview,
+  dailyCycleHasStartedRitual,
+  dailyCycleHasStartedSleepAidAfterReview,
+  dailyCycleIsReadyToSleepAfterReview
+} from "@/utils/dailyCycle";
 import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
 
 function isTerminalDailyCycle(record: RescueData["executionRecord"]): boolean {
@@ -31,6 +37,26 @@ function isTerminalDailyCycle(record: RescueData["executionRecord"]): boolean {
 
 function isInactiveSession(session: RescueData["session"]): boolean {
   return Boolean(session && ["completed", "abandoned"].includes(session.status));
+}
+
+function sessionHasCompletedReview(session: RescueData["session"]): boolean {
+  return Boolean(session?.todayReviewCompleted || session?.todayReviewCompletedAt);
+}
+
+function sessionHasStartedSleepAidAfterReview(session: RescueData["session"]): boolean {
+  return Boolean(sessionHasCompletedReview(session) && session?.status === "in_relax_mode");
+}
+
+function sessionIsReadyToSleepAfterReview(session: RescueData["session"]): boolean {
+  if (!sessionHasCompletedReview(session)) {
+    return false;
+  }
+
+  if (session?.readyToSleepAt) {
+    return session.todayReviewCompletedAt ? session.readyToSleepAt >= session.todayReviewCompletedAt : true;
+  }
+
+  return session?.status === "ready_to_sleep";
 }
 
 function StepCard({ step, index }: { step: FlowStep; index: number }) {
@@ -97,28 +123,26 @@ export default function RescueScreen() {
       const session = isInactiveSession(rawSession) ? null : rawSession;
       const executionRecord = isTerminalDailyCycle(rawExecutionRecord) ? null : rawExecutionRecord;
 
-      if (dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep") {
+      if (dailyCycleIsReadyToSleepAfterReview(executionRecord) || sessionIsReadyToSleepAfterReview(session)) {
         router.push("/");
         return;
       }
 
       if (
-        dailyCycleAtLeast(executionRecord, "sleep_aid_started") ||
-        session?.sleepGeneratorUsed ||
-        session?.relaxModeUsed ||
-        session?.treeHoleUsed
+        dailyCycleHasStartedSleepAidAfterReview(executionRecord) ||
+        sessionHasStartedSleepAidAfterReview(session)
       ) {
         router.push("/sleep-generator");
         return;
       }
 
-      if (dailyCycleAtLeast(executionRecord, "review_completed") || session?.todayReviewCompleted) {
+      if (dailyCycleHasCompletedReview(executionRecord) || sessionHasCompletedReview(session)) {
         router.push("/sleep-generator");
         return;
       }
 
       if (
-        dailyCycleAtLeast(executionRecord, "external_closed") ||
+        dailyCycleHasClosedExternal(executionRecord) ||
         (session?.ritualStep ?? 0) >= 1 ||
         session?.status === "in_rescue_flow"
       ) {
@@ -130,7 +154,7 @@ export default function RescueScreen() {
         ? { session, startedNewGrowthWeek: false }
         : await startTodaySessionWithNotice();
       const startedSession = startResult.session;
-      if (!dailyCycleAtLeast(executionRecord, "ritual_started")) {
+      if (!dailyCycleHasStartedRitual(executionRecord)) {
         await markRitualStarted();
       }
 
@@ -176,7 +200,9 @@ export default function RescueScreen() {
       const rawExecutionRecord = data?.executionRecord ?? null;
       const session = isInactiveSession(rawSession) ? null : rawSession;
       const executionRecord = isTerminalDailyCycle(rawExecutionRecord) ? null : rawExecutionRecord;
-      const alreadyReadyToSleep = dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep";
+      const alreadyReadyToSleep =
+        dailyCycleIsReadyToSleepAfterReview(executionRecord) ||
+        sessionIsReadyToSleepAfterReview(session);
       let startedNewGrowthWeek = false;
 
       if (!alreadyReadyToSleep) {

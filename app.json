@@ -13,7 +13,8 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-audio",
-      "expo-notifications"
+      "expo-notifications",
+      "./plugins/withSleepAudioMonitoring"
     ],
     "experiments": {
       "typedRoutes": true
@@ -34,7 +35,9 @@
       "versionCode": 1,
       "permissions": [
         "RECORD_AUDIO",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MICROPHONE"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

@@ -9,11 +9,9 @@ import { AppCard } from "@/components/common/AppCard";
 import { ReadyToSleepDialog } from "@/components/common/ReadyToSleepDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
-import { markReadyToSleep, markSleepGeneratorUsed } from "@/storage/rescueSessionStorage";
-import {
-  markReadyToSleep as markExecutionReadyToSleep,
-  markSleepAidStarted
-} from "@/storage/dailyExecutionStorage";
+import { completeReadyToSleepAfterRescue } from "@/features/rescue/readyToSleepUseCase";
+import { markSleepGeneratorUsed } from "@/storage/rescueSessionStorage";
+import { markSleepAidStarted } from "@/storage/dailyExecutionStorage";
 
 type SoundOption = {
   id: string;
@@ -137,11 +135,12 @@ export default function BedtimeScreen() {
     setIsClosing(true);
     try {
       stopCurrentPlayer();
-      await Promise.all([
-        markReadyToSleep(),
-        markExecutionReadyToSleep()
-      ]);
+      const completed = await completeReadyToSleepAfterRescue();
       setShowReadyToSleepDialog(false);
+      if (!completed) {
+        router.replace("/rescue");
+        return;
+      }
       router.replace("/rescue");
     } finally {
       setIsClosing(false);

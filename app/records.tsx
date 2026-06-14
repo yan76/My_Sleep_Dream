@@ -32,13 +32,18 @@ const periodLabels: Record<GrowthDimension, string> = {
 
 const periodOrder: GrowthDimension[] = ["week", "month", "all"];
 
-const streakBadge = require("../assets/badges/streak-badge.png");
-const noWhiteNightBadge = require("../assets/badges/no-white-night-badge.png");
-const adviceBackground = require("../assets/ui/growth-advice-background.png");
 const monthCompareMoonscape = require("../assets/ui/month-compare-moonscape.png");
 const monthChangeClock = require("../assets/ui/month-change-clock.png");
 const monthChangePhone = require("../assets/ui/month-change-phone.png");
 const monthChangeSunrise = require("../assets/ui/month-change-sunrise.png");
+const journalEntryIcon = require("../assets/generated/yueban-growth-ui/assets/icons/icon-growth-journal-leaf-01.png");
+const growthStreakBadge = require("../assets/badges/streak-badge.png");
+const growthMoonBadge = require("../assets/badges/no-white-night-badge.png");
+const growthLockedBadge = require("../assets/generated/yueban-growth-ui/assets/icons/icon-growth-locked-badge-01.png");
+const growthAdviceBackground = require("../assets/ui/growth-advice-card-background.png");
+
+const growthAdviceCardRatio = 685 / 345;
+const growthAdviceButtonRatio = 676 / 109;
 
 function GlassCard({ children, style }: { children: React.ReactNode; style?: object }) {
   return <View style={[styles.glassCard, style]}>{children}</View>;
@@ -127,13 +132,15 @@ function HeroCopy({ eyebrow, title, subtitle }: { eyebrow: string; title: string
         <View style={styles.eyebrowDot} />
         <Text style={styles.eyebrow}>{eyebrow}</Text>
       </View>
-      <Text style={styles.heroTitle}>{title}</Text>
+      <Text style={styles.heroTitle} numberOfLines={2}>
+        {title}
+      </Text>
       <Text style={styles.heroSubtitle}>{subtitle}</Text>
     </View>
   );
 }
 
-function ProgressCard({ stats }: { stats: GrowthStats }) {
+function ProgressCard({ stats, reviewCount }: { stats: GrowthStats; reviewCount: number }) {
   return (
     <GlassCard style={styles.progressCard}>
       <View style={styles.progressHeader}>
@@ -142,6 +149,7 @@ function ProgressCard({ stats }: { stats: GrowthStats }) {
       </View>
       <Text style={styles.bigGold}>{stats.averageLabel}</Text>
       <Text style={styles.cardBody}>{stats.averageCaption}</Text>
+      <JournalEntryCard reviewCount={reviewCount} embedded />
     </GlassCard>
   );
 }
@@ -172,50 +180,184 @@ function WeekTrend({ bars }: { bars: TrendBar[] }) {
   );
 }
 
-function CircleMetric({ label, value, caption }: { label: string; value: string; caption: string }) {
+function MetricStrip({ stats }: { stats: GrowthStats }) {
+  const metrics = [
+    { label: "复盘", value: String(stats.reviewCount), caption: "没有恐惧冻结更深夜" },
+    { label: "暂停", value: String(stats.pauseCount), caption: "想刷手机时停下来" },
+    { label: "精神不错", value: String(stats.goodMoodCount), caption: "睡来状态比较期待" }
+  ];
+
   return (
-    <GlassCard style={styles.circleMetric}>
-      <View style={styles.ring}>
-        <View style={styles.ringCutout}>
-          <Text style={styles.ringValue}>{value}</Text>
+    <GlassCard style={styles.metricStrip}>
+      {metrics.map((item, index) => (
+        <View key={item.label} style={[styles.metricStripItem, index > 0 && styles.metricStripDivider]}>
+          <Text style={styles.metricStripLabel}>{item.label}</Text>
+          <Text style={[styles.metricStripValue, index === 1 && styles.metricStripValueCool]}>{item.value}</Text>
+          <Text style={styles.metricStripCaption} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>
+            {item.caption}
+          </Text>
         </View>
-      </View>
-      <Text style={styles.metricTitle}>{label}</Text>
-      <Text style={styles.metricCaption}>{caption}</Text>
+      ))}
     </GlassCard>
   );
 }
 
-function BadgeTile({ image, title, caption }: { image: ImageSourcePropType; title: string; caption: string }) {
-  return (
-    <GlassCard style={styles.badgeTile}>
-      <Image source={image} style={styles.badgeIcon} resizeMode="contain" />
-      <View style={styles.badgeCopy}>
-        <Text style={styles.badgeTitle}>{title}</Text>
-        <Text style={styles.metricCaption}>{caption}</Text>
+function AchievementCard({
+  image,
+  title,
+  caption,
+  state,
+  locked = false,
+  onPress
+}: {
+  image: ImageSourcePropType;
+  title: string;
+  caption: string;
+  state: string;
+  locked?: boolean;
+  onPress?: () => void;
+}) {
+  const acquired = state === "已获得";
+  const content = (
+    <GlassCard style={[styles.achievementCard, locked && styles.achievementCardLocked]}>
+      <Image source={image} style={[styles.achievementIcon, locked && styles.achievementIconLocked]} resizeMode="contain" />
+      <View style={styles.achievementCopy}>
+        <Text
+          style={[styles.achievementTitle, locked && styles.achievementTitleLocked]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.82}
+        >
+          {title}
+        </Text>
+        <Text style={styles.achievementCaption} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+          {caption}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.achievementState,
+          locked ? styles.achievementStateLocked : acquired ? styles.achievementStateAcquired : styles.achievementStateActive
+        ]}
+      >
+        <Text
+          style={[
+            styles.achievementStateText,
+            acquired && styles.achievementStateTextAcquired,
+            locked && styles.achievementStateTextLocked
+          ]}
+        >
+          {state}
+        </Text>
       </View>
     </GlassCard>
+  );
+
+  if (!onPress) {
+    return content;
+  }
+
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => pressed && styles.achievementPressed}>
+      {content}
+    </Pressable>
+  );
+}
+
+function AchievementRail({ stats, streak }: { stats: GrowthStats; streak: number }) {
+  return (
+    <View style={styles.achievementBlock}>
+      <View style={styles.achievementHeader}>
+        <Text style={styles.achievementSectionTitle}>这一周的成就轨</Text>
+        <Text style={styles.achievementSectionState}>
+          <Text style={styles.achievementSectionStateAcquired}>已获得</Text>
+          <Text> / 正在接近</Text>
+        </Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.achievementRail}
+      >
+        <AchievementCard
+          image={growthStreakBadge}
+          title={`${Math.max(streak, 1)} 天连胜`}
+          caption="连续完成睡前收尾"
+          state="已获得"
+          onPress={() => router.push("/badges")}
+        />
+        <AchievementCard
+          image={growthMoonBadge}
+          title={stats.pauseCount > 0 ? "没白熬徽章" : "正在接近徽章"}
+          caption="成为更好的自己"
+          state="接近中"
+          onPress={() => router.push("/badges")}
+        />
+        <AchievementCard
+          image={growthLockedBadge}
+          title="复盘稳定"
+          caption="再记录 1 次"
+          state="未解锁"
+          locked
+          onPress={() => router.push("/badges")}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 function MoonAdvice({ title, body, buttonTitle, onPress }: { title: string; body: string; buttonTitle: string; onPress: () => void }) {
+  const [cardWidth, setCardWidth] = useState(0);
+  const cardTextScale = cardWidth > 0 ? Math.min(1, Math.max(0.72, cardWidth / 685)) : 0.72;
+  const displayTitle = title === "这不是自律奇迹，是你真的开始学会爱惜自己了。"
+    ? "这不是自律奇迹，\n是你真的开始学会\n爱惜自己了。"
+    : title;
+  const displayBody = body === "今晚建议：睡前 10 分钟先写下“没完成的事”。"
+    ? "今晚建议：睡前 10 分钟\n先写下“没完成的事”。"
+    : body;
+
   return (
     <View style={styles.adviceBlock}>
-      <View style={[styles.glassCard, styles.adviceCard]}>
-        <Image source={adviceBackground} style={styles.adviceBackgroundImage} resizeMode="cover" />
-        <View style={styles.adviceScrim} />
-        <View style={styles.adviceForeground}>
-          <View style={styles.adviceMoonIcon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <View style={styles.moonBase} />
-            <View style={styles.moonCutout} />
-            <Text style={[styles.moonStar, styles.moonStarOne]}>✦</Text>
-            <Text style={[styles.moonStar, styles.moonStarTwo]}>✦</Text>
-            <Text style={[styles.moonStar, styles.moonStarThree]}>✦</Text>
-          </View>
-          <View style={styles.adviceTextWrap}>
-            <Text style={styles.adviceTitle}>{title}</Text>
-            <Text style={styles.adviceBody}>{body}</Text>
-          </View>
+      <View
+        style={[styles.glassCard, styles.adviceCard]}
+        onLayout={({ nativeEvent }) => {
+          const nextWidth = Math.round(nativeEvent.layout.width);
+          if (nextWidth > 0 && nextWidth !== cardWidth) {
+            setCardWidth(nextWidth);
+          }
+        }}
+      >
+        <Image source={growthAdviceBackground} style={styles.adviceBackgroundImage} resizeMode="stretch" />
+        <View style={styles.adviceImageScrim} />
+        <View style={styles.adviceTextLayer}>
+          <Text
+            style={[
+              styles.adviceTitle,
+              {
+                fontSize: 25 * cardTextScale,
+                lineHeight: 36 * cardTextScale
+              }
+            ]}
+            numberOfLines={3}
+            adjustsFontSizeToFit
+            minimumFontScale={0.86}
+          >
+            {displayTitle}
+          </Text>
+          <Text
+            style={[
+              styles.adviceBody,
+              {
+                fontSize: 16 * cardTextScale,
+                lineHeight: 26 * cardTextScale
+              }
+            ]}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.9}
+          >
+            {displayBody}
+          </Text>
         </View>
       </View>
       <GradientButton title={buttonTitle} onPress={onPress} />
@@ -377,6 +519,37 @@ function countGrowthSignals(
   ]).size;
 }
 
+function JournalEntryCard({ reviewCount, embedded = false }: { reviewCount: number; embedded?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.journalEntryCard,
+        embedded && styles.journalEntryCardEmbedded,
+        pressed && styles.journalEntryPressed
+      ]}
+      onPress={() => router.push("/journal")}
+    >
+      <View style={styles.journalEntryIcon}>
+        <Image source={journalEntryIcon} style={styles.journalEntryIconImage} resizeMode="contain" />
+      </View>
+      <View style={styles.journalEntryCopy}>
+        <Text style={styles.journalEntryTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+          复盘日记本
+        </Text>
+        <Text style={styles.journalEntryBody} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.84}>
+          {reviewCount > 0
+            ? `看看以前 ${reviewCount} 天写下的话，把那些夜晚重新接住。`
+            : "今晚写下第一句后，这里会收好你的睡前文字。"}
+        </Text>
+      </View>
+      <View style={styles.journalEntryAction}>
+        <Text style={styles.journalEntryActionText}>查看</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function EmptyGrowthState() {
   return (
     <>
@@ -389,6 +562,7 @@ function EmptyGrowthState() {
         <Text style={styles.emptyTitle}>现在还不用看数据</Text>
         <Text style={styles.emptyBody}>第一条记录只负责建立基线。哪怕今晚只是写一句复盘、选一个助眠入口，也已经足够开始。</Text>
       </GlassCard>
+      <JournalEntryCard reviewCount={0} />
       <GradientButton title="开始今晚自救" onPress={() => router.push("/rescue")} />
     </>
   );
@@ -420,25 +594,18 @@ function GrowthReadinessCard({
   );
 }
 
-function WeekView({ stats, streak }: { stats: GrowthStats; streak: number }) {
+function WeekView({ stats, streak, reviewCount }: { stats: GrowthStats; streak: number; reviewCount: number }) {
   return (
     <>
       <HeroCopy
         eyebrow="你在慢慢变好"
-        title="这周，你开始让自己变得更好了"
-        subtitle="不需要完美，能看见变化就已经很好。"
+        title="这周，你会成为更好的自己"
+        subtitle="不用每晚都完美，能看见变化就已经很好。"
       />
-      <ProgressCard stats={stats} />
+      <ProgressCard stats={stats} reviewCount={reviewCount} />
       <WeekTrend bars={stats.weekBars} />
-      <View style={styles.circleGrid}>
-        <CircleMetric label="复盘" value={String(stats.reviewCount)} caption="没有恐惧冻结更深夜" />
-        <CircleMetric label="暂停" value={String(stats.pauseCount)} caption="想刷手机时停下来" />
-        <CircleMetric label="不错" value={String(stats.goodMoodCount)} caption="睡来状态比较期待" />
-      </View>
-      <View style={styles.badgeGrid}>
-        <BadgeTile image={streakBadge} title={`${Math.max(streak, 1)} 天连胜`} caption="连续完成睡前收尾" />
-        <BadgeTile image={noWhiteNightBadge} title={stats.pauseCount > 0 ? "没白熬徽章" : "正在接近徽章"} caption="你开始把自己带回来了" />
-      </View>
+      <MetricStrip stats={stats} />
+      <AchievementRail stats={stats} streak={streak} />
       <MoonAdvice
         title="这不是自律奇迹，是你真的开始学会爱惜自己了。"
         body="今晚建议：睡前 10 分钟先写下“没完成的事”。"
@@ -560,14 +727,19 @@ function Content({
     return <EmptyGrowthState />;
   }
 
+  if (dimension === "week") {
+    return <WeekView stats={stats} streak={streak} reviewCount={reviews.length} />;
+  }
+
   const body = dimension === "month"
     ? <MonthView stats={stats} />
     : dimension === "all"
       ? <AllView stats={stats} />
-      : <WeekView stats={stats} streak={streak} />;
+      : null;
 
   return (
     <>
+      <JournalEntryCard reviewCount={reviews.length} />
       <GrowthReadinessCard signalCount={signalCount} streak={streak} />
       {body}
     </>
@@ -579,7 +751,7 @@ export default function RecordsScreen() {
   const [data, setData] = useState<GrowthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dimension, setDimension] = useState<GrowthDimension>("week");
-  const [periodExpanded, setPeriodExpanded] = useState(false);
+  const [periodExpanded, setPeriodExpanded] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [showPendingWeekRolloverDialog, setShowPendingWeekRolloverDialog] = useState(false);
   const pendingWeekRolloverPrompted = useRef(false);
@@ -644,6 +816,11 @@ export default function RecordsScreen() {
     }
   };
 
+  const isWeekDimension = dimension === "week";
+  const weekHorizontalPadding = Math.round(Math.min(30, Math.max(22, metrics.width * 0.0563)));
+  const weekContentTopPadding = metrics.isShortHeight ? 20 : 24;
+  const weekContentGap = metrics.isShortHeight ? 16 : 18;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View pointerEvents="none" style={styles.backgroundLayer}>
@@ -659,10 +836,10 @@ export default function RecordsScreen() {
           style={[
             styles.content,
             {
-              maxWidth: metrics.contentMaxWidth,
-              paddingHorizontal: metrics.contentHorizontalPadding,
-              paddingTop: metrics.contentTopPadding,
-              gap: metrics.contentGap
+              maxWidth: isWeekDimension ? metrics.width : metrics.contentMaxWidth,
+              paddingHorizontal: isWeekDimension ? weekHorizontalPadding : metrics.contentHorizontalPadding,
+              paddingTop: isWeekDimension ? weekContentTopPadding : metrics.contentTopPadding,
+              gap: isWeekDimension ? weekContentGap : metrics.contentGap
             }
           ]}
         >
@@ -672,7 +849,7 @@ export default function RecordsScreen() {
             onExpand={() => setPeriodExpanded(true)}
             onChange={changeDimension}
           />
-          {isDemoMode ? <TestDataButton busy={seeding} onPress={addTestData} /> : null}
+          {isDemoMode && !isWeekDimension ? <TestDataButton busy={seeding} onPress={addTestData} /> : null}
           {loading || !stats || !data ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color="#E6D5B8" />
@@ -724,21 +901,22 @@ const styles = StyleSheet.create({
   },
   topGlow: {
     position: "absolute",
-    width: 480,
-    height: 320,
-    borderRadius: 240,
-    left: -150,
-    top: -120,
-    backgroundColor: "#242142"
+    width: 392,
+    height: 392,
+    borderRadius: 196,
+    left: 0,
+    top: -152,
+    backgroundColor: "#2B2850",
+    opacity: 0.74
   },
   sideGlow: {
     position: "absolute",
-    width: 360,
-    height: 520,
-    borderRadius: 180,
-    right: -230,
-    top: 120,
-    backgroundColor: "#151833"
+    width: 500,
+    height: 700,
+    borderRadius: 250,
+    right: -360,
+    top: 155,
+    backgroundColor: "#17213C"
   },
   scrollContent: {
     flexGrow: 1
@@ -821,14 +999,14 @@ const styles = StyleSheet.create({
     color: "#10101B"
   },
   hero: {
-    gap: 16,
-    marginBottom: 10
+    gap: 8,
+    marginBottom: 0
   },
   testDataButton: {
     alignSelf: "flex-end",
-    minHeight: 34,
-    paddingHorizontal: 14,
-    borderRadius: 17,
+    minHeight: 38,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(230,213,184,0.28)",
     backgroundColor: "rgba(230,213,184,0.1)",
@@ -840,37 +1018,38 @@ const styles = StyleSheet.create({
   },
   testDataButtonText: {
     color: "#E6D5B8",
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: "900"
   },
   eyebrowRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11
+    gap: 9
   },
   eyebrowDot: {
-    width: 10,
-    height: 10,
+    width: 9,
+    height: 9,
     borderRadius: 5,
     backgroundColor: "#E6D5B8"
   },
   eyebrow: {
     color: "#E6D5B8",
-    fontSize: 20,
+    fontSize: 17,
+    lineHeight: 23,
     fontWeight: "900"
   },
   heroTitle: {
     color: "#F5F6FF",
-    fontSize: 42,
-    lineHeight: 54,
+    fontSize: 31,
+    lineHeight: 38,
     fontWeight: "900"
   },
   heroSubtitle: {
     color: "#A6ABBF",
-    fontSize: 19,
-    lineHeight: 30,
-    fontWeight: "600"
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800"
   },
   glassCard: {
     borderRadius: 28,
@@ -898,6 +1077,78 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     fontWeight: "700"
   },
+  journalEntryCard: {
+    minHeight: 112,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+    overflow: "hidden"
+  },
+  journalEntryCardEmbedded: {
+    height: 64,
+    marginTop: 4,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    backgroundColor: "rgba(255,255,255,0.045)"
+  },
+  journalEntryPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.86
+  },
+  journalEntryIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor: "rgba(230,213,184,0.28)",
+    backgroundColor: "rgba(230,213,184,0.12)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  journalEntryIconImage: {
+    width: 34,
+    height: 34
+  },
+  journalEntryCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2
+  },
+  journalEntryTitle: {
+    color: "#F5F6FF",
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900"
+  },
+  journalEntryBody: {
+    color: "#A6ABBF",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700"
+  },
+  journalEntryAction: {
+    minHeight: 30,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "rgba(230,213,184,0.3)",
+    backgroundColor: "rgba(230,213,184,0.1)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  journalEntryActionText: {
+    color: "#E6D5B8",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
   readinessCard: {
     minHeight: 112,
     padding: 20,
@@ -919,9 +1170,15 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   progressCard: {
-    minHeight: 154,
-    padding: 28,
-    gap: 13
+    minHeight: 236,
+    marginTop: 0,
+    paddingHorizontal: 22,
+    paddingTop: 21,
+    paddingBottom: 13,
+    gap: 6,
+    borderRadius: 24,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.075)"
   },
   progressHeader: {
     flexDirection: "row",
@@ -931,14 +1188,14 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     color: "#A6ABBF",
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: "900"
   },
   statusPill: {
-    minHeight: 38,
-    paddingHorizontal: 15,
-    borderRadius: 19,
+    minHeight: 30,
+    paddingHorizontal: 12,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: "rgba(153,227,187,0.28)",
     backgroundColor: "rgba(153,227,187,0.13)",
@@ -947,27 +1204,30 @@ const styles = StyleSheet.create({
   },
   statusPillText: {
     color: "#99E3BB",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "900"
   },
   bigGold: {
     color: "#F1DDAA",
-    fontSize: 48,
-    lineHeight: 58,
+    fontSize: 39,
+    lineHeight: 47,
     fontWeight: "900"
   },
   cardBody: {
     color: "#A6ABBF",
-    fontSize: 17,
-    lineHeight: 27,
-    fontWeight: "600"
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800"
   },
   weekTrendCard: {
-    minHeight: 306,
+    minHeight: 244,
     paddingHorizontal: 24,
-    paddingTop: 26,
-    paddingBottom: 24,
-    gap: 24
+    paddingTop: 24,
+    paddingBottom: 16,
+    gap: 18,
+    borderRadius: 24,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(24,24,49,0.76)"
   },
   sectionHeader: {
     flexDirection: "row",
@@ -983,25 +1243,26 @@ const styles = StyleSheet.create({
   },
   goldSmall: {
     color: "#E6D5B8",
-    fontSize: 18,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: "900"
   },
   barChart: {
-    height: 188,
+    height: 158,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingHorizontal: 4
+    paddingHorizontal: 6
   },
   barColumn: {
-    width: 34,
+    width: 32,
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 16
+    gap: 14
   },
   trendBar: {
-    width: 28,
-    borderRadius: 14,
+    width: 30,
+    borderRadius: 15,
     overflow: "hidden"
   },
   trendBarActive: {
@@ -1016,172 +1277,211 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "900"
   },
-  circleGrid: {
+  metricStrip: {
+    minHeight: 104,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 11
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    borderRadius: 26,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "rgba(255,255,255,0.055)"
   },
-  circleMetric: {
+  metricStripItem: {
     flex: 1,
-    minWidth: 130,
-    minHeight: 136,
-    paddingVertical: 22,
-    paddingHorizontal: 12,
+    minWidth: 0,
+    paddingHorizontal: 6,
     alignItems: "center",
-    gap: 8
+    justifyContent: "center",
+    gap: 2
   },
-  ring: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 8,
-    borderColor: "#E6D5B8",
-    alignItems: "center",
-    justifyContent: "center"
+  metricStripDivider: {
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(255,255,255,0.18)"
   },
-  ringCutout: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  ringValue: {
-    color: "#F1DDAA",
-    fontSize: 24,
-    fontWeight: "900"
-  },
-  metricTitle: {
-    color: "#F5F6FF",
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  metricCaption: {
-    color: "#A6ABBF",
+  metricStripLabel: {
+    color: "#C9CDE0",
     fontSize: 14,
-    lineHeight: 21,
+    lineHeight: 19,
+    fontWeight: "900"
+  },
+  metricStripValue: {
+    color: "#F1DDAA",
+    fontSize: 38,
+    lineHeight: 42,
+    fontWeight: "900"
+  },
+  metricStripValueCool: {
+    color: "#DFE4FF"
+  },
+  metricStripCaption: {
+    color: "#A6ABBF",
+    fontSize: 10,
+    lineHeight: 14,
     fontWeight: "600",
     textAlign: "center"
   },
-  badgeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12
+  achievementBlock: {
+    gap: 16
   },
-  badgeTile: {
-    flex: 1,
-    minWidth: 150,
-    minHeight: 114,
-    padding: 16,
+  achievementHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 12
   },
-  badgeIcon: {
-    width: 74,
-    height: 74
-  },
-  badgeCopy: {
-    flex: 1,
-    gap: 5
-  },
-  badgeTitle: {
+  achievementSectionTitle: {
     color: "#F5F6FF",
-    fontSize: 19,
-    lineHeight: 25,
+    fontSize: 25,
+    lineHeight: 34,
     fontWeight: "900"
   },
+  achievementSectionState: {
+    color: "#A6ABBF",
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: "900"
+  },
+  achievementSectionStateAcquired: {
+    color: "#E6D5B8"
+  },
+  achievementRail: {
+    gap: 14,
+    paddingBottom: 12,
+    paddingRight: 20
+  },
+  achievementCard: {
+    width: 154,
+    minHeight: 224,
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 26,
+    borderColor: "rgba(230,213,184,0.32)",
+    backgroundColor: "rgba(255,255,255,0.075)",
+    gap: 6
+  },
+  achievementCardLocked: {
+    borderColor: "rgba(255,255,255,0.1)",
+    opacity: 0.72
+  },
+  achievementPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.88
+  },
+  achievementIcon: {
+    width: 76,
+    height: 76,
+    marginTop: 2,
+    marginBottom: 4
+  },
+  achievementIconLocked: {
+    opacity: 0.8
+  },
+  achievementCopy: {
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3
+  },
+  achievementTitle: {
+    color: "#F5F6FF",
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  achievementTitleLocked: {
+    color: "#C7CADC"
+  },
+  achievementCaption: {
+    color: "#A6ABBF",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  achievementState: {
+    minHeight: 28,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  achievementStateActive: {
+    borderColor: "rgba(153,227,187,0.3)",
+    backgroundColor: "rgba(153,227,187,0.12)"
+  },
+  achievementStateAcquired: {
+    borderColor: "rgba(241,221,170,0.38)",
+    backgroundColor: "rgba(241,221,170,0.15)"
+  },
+  achievementStateLocked: {
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)"
+  },
+  achievementStateText: {
+    color: "#99E3BB",
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "900"
+  },
+  achievementStateTextAcquired: {
+    color: "#F1DDAA"
+  },
+  achievementStateTextLocked: {
+    color: "#A6ABBF"
+  },
   adviceBlock: {
-    gap: 14
+    gap: 18
   },
   adviceCard: {
-    minHeight: 160,
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 22,
-    borderColor: "rgba(230,213,184,0.32)",
+    width: "100%",
+    aspectRatio: growthAdviceCardRatio,
+    borderRadius: 26,
+    borderWidth: 0,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#111426",
     justifyContent: "center"
   },
   adviceBackgroundImage: {
-    position: "absolute",
-    left: -8,
-    top: -20,
-    width: "106%",
-    height: "130%"
-  },
-  adviceScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(7,8,23,0.1)"
+    width: "100%",
+    height: "100%"
   },
-  adviceForeground: {
-    zIndex: 2,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 22
+  adviceImageScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(7,8,23,0.04)"
   },
-  adviceMoonIcon: {
-    width: 62,
-    height: 72,
-    position: "relative"
-  },
-  moonBase: {
-    position: "absolute",
-    left: 8,
-    top: 10,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F0DCA9"
-  },
-  moonCutout: {
-    position: "absolute",
-    left: 27,
-    top: 4,
-    width: 43,
-    height: 43,
-    borderRadius: 22,
-    backgroundColor: "#37303A"
-  },
-  moonStar: {
-    position: "absolute",
-    color: "#F0DCA9",
-    fontSize: 11,
-    lineHeight: 13,
-    fontWeight: "900"
-  },
-  moonStarOne: {
-    right: 6,
-    top: 6
-  },
-  moonStarTwo: {
-    left: 0,
-    bottom: 8,
-    opacity: 0.78
-  },
-  moonStarThree: {
-    right: 10,
-    bottom: 0,
-    opacity: 0.72
-  },
-  adviceTextWrap: {
-    flex: 1,
-    gap: 14
+  adviceTextLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2
   },
   adviceTitle: {
+    position: "absolute",
+    left: "45.55%",
+    right: "8.18%",
+    top: "13.62%",
     color: "#E6D5B8",
-    fontSize: 25,
-    lineHeight: 36,
-    fontWeight: "900"
+    fontWeight: "900",
+    includeFontPadding: false
   },
   adviceBody: {
+    position: "absolute",
+    left: "45.55%",
+    right: "8.18%",
+    top: "70.14%",
     color: "#A6ABBF",
-    fontSize: 16,
-    lineHeight: 26,
-    fontWeight: "600"
+    fontWeight: "600",
+    includeFontPadding: false
   },
   gradientButton: {
-    minHeight: 58,
-    borderRadius: 29,
+    width: "98.7%",
+    aspectRatio: growthAdviceButtonRatio,
+    alignSelf: "center",
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -1189,8 +1489,8 @@ const styles = StyleSheet.create({
   },
   gradientButtonText: {
     color: "#10101B",
-    fontSize: 19,
-    lineHeight: 26,
+    fontSize: 21,
+    lineHeight: 29,
     fontWeight: "900",
     zIndex: 2
   },

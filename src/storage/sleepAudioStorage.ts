@@ -5,7 +5,7 @@ import {
   replaceSleepAudioSessionsInSQLite
 } from "@/storage/sqlite/sleepAudioRepository";
 import { storageKeys } from "@/storage/storageKeys";
-import { SleepAudioSession, SleepAudioSessionStatus } from "@/types/app";
+import { SleepAudioEvent, SleepAudioSession, SleepAudioSessionStatus } from "@/types/app";
 
 type StoredSleepAudioSessions = Record<string, SleepAudioSession>;
 type SleepAudioSessionPatch = Partial<Pick<SleepAudioSession, "events" | "eventCount" | "localAudioUri" | "summary">>;
@@ -48,12 +48,53 @@ async function writeSleepAudioMap(sessions: StoredSleepAudioSessions): Promise<v
 }
 
 function normalizeSession(session: SleepAudioSession): SleepAudioSession {
+  const events = session.events ?? [];
+
   return {
     ...session,
     status: session.status ?? "idle",
-    eventCount: session.eventCount ?? session.events?.length ?? 0,
-    events: session.events ?? [],
+    eventCount: session.eventCount ?? events.length,
+    events,
     localAudioUri: session.localAudioUri
+  };
+}
+
+function countEvents(events: SleepAudioEvent[], type: SleepAudioEvent["type"]): number {
+  return events.filter((event) => event.type === type).length;
+}
+
+function durationForEvents(events: SleepAudioEvent[], type: SleepAudioEvent["type"]): number {
+  return events
+    .filter((event) => event.type === type)
+    .reduce((sum, event) => sum + event.durationMs, 0);
+}
+
+function peakDbForEvents(events: SleepAudioEvent[]): number | undefined {
+  const values = events
+    .map((event) => event.peakDb)
+    .filter((value): value is number => typeof value === "number");
+
+  return values.length ? Math.max(...values) : undefined;
+}
+
+function createSleepAudioSummary(events: SleepAudioEvent[]): SleepAudioSession["summary"] {
+  const totalEventDurationMs = events.reduce((sum, event) => sum + event.durationMs, 0);
+  const eventCount = events.length;
+
+  return {
+    hasVoiceLikeSound: events.some((event) => event.type === "voice_like"),
+    hasSnoreLikeSound: events.some((event) => event.type === "snore_like"),
+    eventCount,
+    voiceLikeCount: countEvents(events, "voice_like"),
+    snoreLikeCount: countEvents(events, "snore_like"),
+    coughLikeCount: countEvents(events, "cough_like"),
+    movementLikeCount: countEvents(events, "movement_like"),
+    noiseLikeCount: countEvents(events, "noise_like"),
+    totalEventDurationMs,
+    totalVoiceLikeDurationMs: durationForEvents(events, "voice_like"),
+    totalSnoreLikeDurationMs: durationForEvents(events, "snore_like"),
+    peakDb: peakDbForEvents(events),
+    quietScore: eventCount === 0 ? 92 : Math.max(20, Math.min(88, 88 - eventCount * 4 - Math.floor(totalEventDurationMs / 60000)))
   };
 }
 
@@ -109,13 +150,33 @@ export async function updateSleepAudioSessionStatus(
     stoppedAt: status === "stopped" || status === "completed" ? now : current.stoppedAt,
     summary:
       status === "stopped" || status === "completed"
-        ? current.summary ?? {
-            hasVoiceLikeSound: (patch.events ?? current.events).some((event) => event.type === "voice_like"),
-            hasSnoreLikeSound: (patch.events ?? current.events).some((event) => event.type === "snore_like"),
-            quietScore: (patch.events ?? current.events).length === 0 ? 92 : undefined
-          }
-        : current.summary,
+        ? patch.summary ?? createSleepAudioSummary(patch.events ?? current.events)
+        : patch.summary ?? current.summary,
     updatedAt: now
+  };
+
+  await writeSleepAudioMap({ ...sessions, [date]: next });
+  return next;
+}
+
+export async function updateSleepAudioSessionFiles(
+  date: string,
+  patch: Pick<SleepAudioSessionPatch, "events" | "localAudioUri">
+): Promise<SleepAudioSession | null> {
+  const sessions = await readSleepAudioMap();
+  const current = sessions[date] ? normalizeSession(sessions[date]) : null;
+  if (!current) {
+    return null;
+  }
+
+  const events = patch.events ?? current.events;
+  const next: SleepAudioSession = {
+    ...current,
+    events,
+    eventCount: events.length,
+    localAudioUri: patch.localAudioUri,
+    summary: createSleepAudioSummary(events),
+    updatedAt: nowIso()
   };
 
   await writeSleepAudioMap({ ...sessions, [date]: next });

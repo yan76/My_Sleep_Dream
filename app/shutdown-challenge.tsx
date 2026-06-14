@@ -12,7 +12,7 @@ import {
 } from "@/storage/dailyExecutionStorage";
 import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
 import { getMorningCheckInDate, getTodaySession, markShutdownChallengeCompleted } from "@/storage/rescueSessionStorage";
-import { dailyCycleAtLeast } from "@/utils/dailyCycle";
+import { dailyCycleIsReadyToSleepAfterReview } from "@/utils/dailyCycle";
 
 const TOTAL_SECONDS = 120;
 
@@ -35,6 +35,18 @@ type ChallengeCycleTarget = {
   updateTodaySession: boolean;
 };
 
+function sessionIsReadyToSleepAfterReview(session: Awaited<ReturnType<typeof getTodaySession>>): boolean {
+  if (!session?.todayReviewCompleted && !session?.todayReviewCompletedAt) {
+    return false;
+  }
+
+  if (session.readyToSleepAt) {
+    return session.todayReviewCompletedAt ? session.readyToSleepAt >= session.todayReviewCompletedAt : true;
+  }
+
+  return session.status === "ready_to_sleep";
+}
+
 async function getChallengeCycleTarget(): Promise<ChallengeCycleTarget> {
   const morningCheckInDate = await getMorningCheckInDate();
 
@@ -53,8 +65,8 @@ async function getChallengeCycleTarget(): Promise<ChallengeCycleTarget> {
   ]);
 
   if (
-    dailyCycleAtLeast(todayExecutionRecord, "ready_to_sleep") ||
-    todaySession?.status === "ready_to_sleep"
+    dailyCycleIsReadyToSleepAfterReview(todayExecutionRecord) ||
+    sessionIsReadyToSleepAfterReview(todaySession)
   ) {
     return {
       date,

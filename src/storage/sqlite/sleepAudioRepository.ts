@@ -22,6 +22,8 @@ type SleepAudioEventRow = {
   type: SleepAudioEvent["type"];
   confidence?: number | null;
   local_clip_uri?: string | null;
+  peak_db?: number | null;
+  average_db?: number | null;
 };
 
 const emptyToUndefined = <T>(value: T | null | undefined): T | undefined => value ?? undefined;
@@ -55,7 +57,9 @@ async function getEventsForSession(sessionId: string): Promise<SleepAudioEvent[]
     durationMs: row.duration_ms,
     type: row.type,
     confidence: emptyToUndefined(row.confidence),
-    localClipUri: emptyToUndefined(row.local_clip_uri)
+    localClipUri: emptyToUndefined(row.local_clip_uri),
+    peakDb: emptyToUndefined(row.peak_db),
+    averageDb: emptyToUndefined(row.average_db)
   }));
 }
 
@@ -142,10 +146,12 @@ export async function upsertSleepAudioSessionToSQLite(session: SleepAudioSession
             type,
             confidence,
             local_clip_uri,
+            peak_db,
+            average_db,
             created_at,
             sync_status
           )
-          values (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
         `,
         event.id,
         session.id,
@@ -154,6 +160,8 @@ export async function upsertSleepAudioSessionToSQLite(session: SleepAudioSession
         event.type,
         event.confidence ?? null,
         event.localClipUri ?? null,
+        event.peakDb ?? null,
+        event.averageDb ?? null,
         session.updatedAt
       );
     }

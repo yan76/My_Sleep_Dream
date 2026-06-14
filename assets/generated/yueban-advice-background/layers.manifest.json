@@ -1,0 +1,124 @@
+[
+  {
+    "id": "source-canvas",
+    "type": "vector",
+    "source_image": "source/advice-background-source.png",
+    "source_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 475,
+      "height": 266
+    },
+    "scaled_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 750,
+      "height": 420
+    },
+    "z_index": 0,
+    "notes": "User-provided clipboard image. Scale is 750 / 475 = 1.5789473684."
+  },
+  {
+    "id": "visible-advice-card-shell",
+    "type": "vector",
+    "source_image": "source/advice-background-source.png",
+    "source_bbox": {
+      "x": 20,
+      "y": 22,
+      "width": 438,
+      "height": 221
+    },
+    "scaled_bbox": {
+      "x": 32,
+      "y": 35,
+      "width": 692,
+      "height": 349
+    },
+    "z_index": 1,
+    "notes": "Visible rounded card bbox in the provided screenshot, excluding the next card sliver at the bottom."
+  },
+  {
+    "id": "visible-advice-card-reference",
+    "type": "bitmap",
+    "source_image": "source/advice-background-source-750.png",
+    "source_bbox": {
+      "x": 20,
+      "y": 22,
+      "width": 438,
+      "height": 221
+    },
+    "scaled_bbox": {
+      "x": 32,
+      "y": 35,
+      "width": 692,
+      "height": 349
+    },
+    "z_index": 2,
+    "asset": "assets/images/image-advice-card-reference-01.png",
+    "transparent_required": false,
+    "notes": "750px-normalized reference crop from the current screenshot. Text is baked in and is not used as the frontend background."
+  },
+  {
+    "id": "advice-title-text-occlusion",
+    "type": "text",
+    "source_image": "source/advice-background-source.png",
+    "source_bbox": {
+      "x": 218,
+      "y": 51,
+      "width": 202,
+      "height": 101
+    },
+    "scaled_bbox": {
+      "x": 344,
+      "y": 81,
+      "width": 319,
+      "height": 159
+    },
+    "z_index": 3,
+    "text": "这不是自律奇迹，\n是你真的开始学会\n爱惜自己了。",
+    "notes": "Text is intentionally excluded from the exported frontend background asset."
+  },
+  {
+    "id": "advice-body-text-occlusion",
+    "type": "text",
+    "source_image": "source/advice-background-source.png",
+    "source_bbox": {
+      "x": 219,
+      "y": 174,
+      "width": 235,
+      "height": 39
+    },
+    "scaled_bbox": {
+      "x": 346,
+      "y": 275,
+      "width": 371,
+      "height": 62
+    },
+    "z_index": 4,
+    "text": "今晚建议：睡前 10 分钟先写下\n“没完成的事”。",
+    "notes": "Text is intentionally excluded from the exported frontend background asset."
+  },
+  {
+    "id": "frontend-clean-advice-background",
+    "type": "bitmap",
+    "source_image": "../yueban-growth-ui/source/growth-week-bottom-source.png",
+    "source_bbox": {
+      "x": 37,
+      "y": 919,
+      "width": 779,
+      "height": 392
+    },
+    "scaled_bbox": {
+      "x": 33,
+      "y": 808,
+      "width": 685,
+      "height": 345
+    },
+    "z_index": 5,
+    "asset": "assets/images/image-advice-card-background-clean.png",
+    "frontend_asset": "../../ui/growth-advice-card-background.png",
+    "transparent_required": false,
+    "origin_manifest": "../yueban-growth-ui/layers.manifest.json#bottom-image-advice-full",
+    "notes": "Clean no-text background matching the user-provided card. The current clipboard screenshot contains baked-in text, so the frontend asset reuses the existing verified clean crop from the same Yueban growth UI source."
+  }
+]

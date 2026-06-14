@@ -1,0 +1,714 @@
+[
+  {
+    "id": "bottom-canvas",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 853,
+      "height": 1844
+    },
+    "scaled_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 750,
+      "height": 1621
+    },
+    "z_index": 0,
+    "notes": "Bottom viewport, 750px locked artboard."
+  },
+  {
+    "id": "bottom-metric-strip",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 37,
+      "y": 63,
+      "width": 778,
+      "height": 206
+    },
+    "scaled_bbox": {
+      "x": 33,
+      "y": 55,
+      "width": 684,
+      "height": 181
+    },
+    "z_index": 10
+  },
+  {
+    "id": "bottom-text-metric-review",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 146,
+      "y": 96,
+      "width": 70,
+      "height": 120
+    },
+    "scaled_bbox": {
+      "x": 128,
+      "y": 84,
+      "width": 62,
+      "height": 106
+    },
+    "z_index": 12,
+    "text": "??\n2\n?????????"
+  },
+  {
+    "id": "bottom-text-metric-pause",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 402,
+      "y": 96,
+      "width": 70,
+      "height": 120
+    },
+    "scaled_bbox": {
+      "x": 353,
+      "y": 84,
+      "width": 62,
+      "height": 106
+    },
+    "z_index": 12,
+    "text": "??\n0\n????????"
+  },
+  {
+    "id": "bottom-text-metric-good",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 638,
+      "y": 96,
+      "width": 120,
+      "height": 120
+    },
+    "scaled_bbox": {
+      "x": 561,
+      "y": 84,
+      "width": 106,
+      "height": 106
+    },
+    "z_index": 12,
+    "text": "????\n1\n????????"
+  },
+  {
+    "id": "bottom-text-achievement-title",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 46,
+      "y": 349,
+      "width": 286,
+      "height": 48
+    },
+    "scaled_bbox": {
+      "x": 40,
+      "y": 307,
+      "width": 251,
+      "height": 42
+    },
+    "z_index": 12,
+    "text": "???????"
+  },
+  {
+    "id": "bottom-text-achievement-status",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 612,
+      "y": 351,
+      "width": 197,
+      "height": 35
+    },
+    "scaled_bbox": {
+      "x": 538,
+      "y": 309,
+      "width": 173,
+      "height": 31
+    },
+    "z_index": 12,
+    "text": "??? / ????"
+  },
+  {
+    "id": "bottom-achievement-card-streak",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 37,
+      "y": 429,
+      "width": 292,
+      "height": 443
+    },
+    "scaled_bbox": {
+      "x": 33,
+      "y": 377,
+      "width": 257,
+      "height": 390
+    },
+    "z_index": 10
+  },
+  {
+    "id": "bottom-illustration-streak-badge",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 99,
+      "y": 460,
+      "width": 170,
+      "height": 148
+    },
+    "scaled_bbox": {
+      "x": 87,
+      "y": 404,
+      "width": 149,
+      "height": 130
+    },
+    "z_index": 13,
+    "asset": "assets/illustrations/illustration-growth-streak-badge-01.png",
+    "transparent_required": true,
+    "cut_kind": "gold_badge"
+  },
+  {
+    "id": "bottom-text-streak-title",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 112,
+      "y": 659,
+      "width": 151,
+      "height": 47
+    },
+    "scaled_bbox": {
+      "x": 98,
+      "y": 579,
+      "width": 133,
+      "height": 41
+    },
+    "z_index": 14,
+    "text": "2 ???"
+  },
+  {
+    "id": "bottom-text-streak-copy",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 81,
+      "y": 720,
+      "width": 202,
+      "height": 35
+    },
+    "scaled_bbox": {
+      "x": 71,
+      "y": 633,
+      "width": 178,
+      "height": 31
+    },
+    "z_index": 14,
+    "text": "????????"
+  },
+  {
+    "id": "bottom-streak-state-pill",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 104,
+      "y": 779,
+      "width": 158,
+      "height": 50
+    },
+    "scaled_bbox": {
+      "x": 91,
+      "y": 685,
+      "width": 139,
+      "height": 44
+    },
+    "z_index": 13
+  },
+  {
+    "id": "bottom-text-streak-state",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 143,
+      "y": 791,
+      "width": 84,
+      "height": 28
+    },
+    "scaled_bbox": {
+      "x": 126,
+      "y": 695,
+      "width": 74,
+      "height": 25
+    },
+    "z_index": 14,
+    "text": "???"
+  },
+  {
+    "id": "bottom-achievement-card-moon",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 347,
+      "y": 429,
+      "width": 277,
+      "height": 443
+    },
+    "scaled_bbox": {
+      "x": 305,
+      "y": 377,
+      "width": 244,
+      "height": 390
+    },
+    "z_index": 10
+  },
+  {
+    "id": "bottom-illustration-moon-badge",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 413,
+      "y": 468,
+      "width": 150,
+      "height": 150
+    },
+    "scaled_bbox": {
+      "x": 363,
+      "y": 411,
+      "width": 132,
+      "height": 132
+    },
+    "z_index": 13,
+    "asset": "assets/illustrations/illustration-growth-moon-badge-01.png",
+    "transparent_required": true,
+    "cut_kind": "purple_badge"
+  },
+  {
+    "id": "bottom-text-moon-title",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 390,
+      "y": 667,
+      "width": 198,
+      "height": 40
+    },
+    "scaled_bbox": {
+      "x": 343,
+      "y": 586,
+      "width": 174,
+      "height": 35
+    },
+    "z_index": 14,
+    "text": "??????"
+  },
+  {
+    "id": "bottom-text-moon-copy",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 404,
+      "y": 721,
+      "width": 171,
+      "height": 33
+    },
+    "scaled_bbox": {
+      "x": 355,
+      "y": 634,
+      "width": 150,
+      "height": 29
+    },
+    "z_index": 14,
+    "text": "??????????"
+  },
+  {
+    "id": "bottom-moon-state-pill",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 409,
+      "y": 782,
+      "width": 154,
+      "height": 48
+    },
+    "scaled_bbox": {
+      "x": 360,
+      "y": 688,
+      "width": 135,
+      "height": 42
+    },
+    "z_index": 13
+  },
+  {
+    "id": "bottom-text-moon-state",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 449,
+      "y": 796,
+      "width": 82,
+      "height": 28
+    },
+    "scaled_bbox": {
+      "x": 395,
+      "y": 700,
+      "width": 72,
+      "height": 25
+    },
+    "z_index": 14,
+    "text": "???"
+  },
+  {
+    "id": "bottom-achievement-card-locked",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 640,
+      "y": 429,
+      "width": 282,
+      "height": 443
+    },
+    "scaled_bbox": {
+      "x": 563,
+      "y": 377,
+      "width": 248,
+      "height": 390
+    },
+    "z_index": 10
+  },
+  {
+    "id": "bottom-icon-locked-badge",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 695,
+      "y": 475,
+      "width": 145,
+      "height": 145
+    },
+    "scaled_bbox": {
+      "x": 611,
+      "y": 418,
+      "width": 127,
+      "height": 127
+    },
+    "z_index": 13,
+    "asset": "assets/icons/icon-growth-locked-badge-01.png",
+    "transparent_required": true,
+    "cut_kind": "lock"
+  },
+  {
+    "id": "bottom-text-locked-title",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 705,
+      "y": 667,
+      "width": 143,
+      "height": 39
+    },
+    "scaled_bbox": {
+      "x": 620,
+      "y": 586,
+      "width": 126,
+      "height": 34
+    },
+    "z_index": 14,
+    "text": "????"
+  },
+  {
+    "id": "bottom-text-locked-copy",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 704,
+      "y": 748,
+      "width": 116,
+      "height": 32
+    },
+    "scaled_bbox": {
+      "x": 619,
+      "y": 658,
+      "width": 102,
+      "height": 28
+    },
+    "z_index": 14,
+    "text": "??? 1 ?"
+  },
+  {
+    "id": "bottom-advice-card",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 37,
+      "y": 919,
+      "width": 779,
+      "height": 392
+    },
+    "scaled_bbox": {
+      "x": 33,
+      "y": 808,
+      "width": 685,
+      "height": 345
+    },
+    "z_index": 10
+  },
+  {
+    "id": "bottom-image-advice-full",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 37,
+      "y": 919,
+      "width": 779,
+      "height": 392
+    },
+    "scaled_bbox": {
+      "x": 33,
+      "y": 808,
+      "width": 685,
+      "height": 345
+    },
+    "z_index": 11,
+    "asset": "assets/images/image-growth-advice-card-full-01.png",
+    "transparent_required": false,
+    "notes": "Full card reference crop, text baked in for QA/reference only."
+  },
+  {
+    "id": "bottom-image-advice-moon-scene",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 37,
+      "y": 919,
+      "width": 350,
+      "height": 392
+    },
+    "scaled_bbox": {
+      "x": 33,
+      "y": 808,
+      "width": 308,
+      "height": 345
+    },
+    "z_index": 12,
+    "asset": "assets/images/image-growth-advice-moon-scene-01.png",
+    "transparent_required": false,
+    "notes": "Left moon/cloud scene cut from the current source; right-side copy can be editable in code."
+  },
+  {
+    "id": "bottom-text-advice-title",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 392,
+      "y": 972,
+      "width": 335,
+      "height": 170
+    },
+    "scaled_bbox": {
+      "x": 345,
+      "y": 855,
+      "width": 295,
+      "height": 149
+    },
+    "z_index": 14,
+    "text": "????????\n????????\n??????"
+  },
+  {
+    "id": "bottom-text-advice-copy",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 392,
+      "y": 1194,
+      "width": 360,
+      "height": 70
+    },
+    "scaled_bbox": {
+      "x": 345,
+      "y": 1050,
+      "width": 317,
+      "height": 62
+    },
+    "z_index": 14,
+    "text": "??????? 10 ?????\n????????"
+  },
+  {
+    "id": "bottom-weekly-summary-button",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 44,
+      "y": 1349,
+      "width": 769,
+      "height": 124
+    },
+    "scaled_bbox": {
+      "x": 39,
+      "y": 1186,
+      "width": 676,
+      "height": 109
+    },
+    "z_index": 10
+  },
+  {
+    "id": "bottom-text-weekly-summary-button",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 276,
+      "y": 1393,
+      "width": 299,
+      "height": 42
+    },
+    "scaled_bbox": {
+      "x": 243,
+      "y": 1225,
+      "width": 263,
+      "height": 37
+    },
+    "z_index": 12,
+    "text": "????????"
+  },
+  {
+    "id": "bottom-text-weekly-summary-note",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 165,
+      "y": 1521,
+      "width": 524,
+      "height": 38
+    },
+    "scaled_bbox": {
+      "x": 145,
+      "y": 1337,
+      "width": 461,
+      "height": 33
+    },
+    "z_index": 12,
+    "text": "?????????????????????"
+  },
+  {
+    "id": "bottom-bottom-nav",
+    "type": "vector",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 0,
+      "y": 1595,
+      "width": 853,
+      "height": 249
+    },
+    "scaled_bbox": {
+      "x": 0,
+      "y": 1402,
+      "width": 750,
+      "height": 219
+    },
+    "z_index": 20
+  },
+  {
+    "id": "bottom-icon-nav-home",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 90,
+      "y": 1638,
+      "width": 88,
+      "height": 82
+    },
+    "scaled_bbox": {
+      "x": 79,
+      "y": 1440,
+      "width": 77,
+      "height": 72
+    },
+    "z_index": 22,
+    "asset": "assets/icons/icon-growth-bottom-nav-home-01.png",
+    "transparent_required": true,
+    "cut_kind": "nav"
+  },
+  {
+    "id": "bottom-icon-nav-rescue",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 284,
+      "y": 1638,
+      "width": 90,
+      "height": 84
+    },
+    "scaled_bbox": {
+      "x": 250,
+      "y": 1440,
+      "width": 79,
+      "height": 74
+    },
+    "z_index": 22,
+    "asset": "assets/icons/icon-growth-bottom-nav-rescue-01.png",
+    "transparent_required": true,
+    "cut_kind": "nav"
+  },
+  {
+    "id": "bottom-icon-nav-growth",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 484,
+      "y": 1638,
+      "width": 88,
+      "height": 82
+    },
+    "scaled_bbox": {
+      "x": 426,
+      "y": 1440,
+      "width": 77,
+      "height": 72
+    },
+    "z_index": 22,
+    "asset": "assets/icons/icon-growth-bottom-nav-growth-active-01.png",
+    "transparent_required": true,
+    "cut_kind": "nav"
+  },
+  {
+    "id": "bottom-icon-nav-settings",
+    "type": "bitmap",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 688,
+      "y": 1638,
+      "width": 88,
+      "height": 82
+    },
+    "scaled_bbox": {
+      "x": 605,
+      "y": 1440,
+      "width": 77,
+      "height": 72
+    },
+    "z_index": 22,
+    "asset": "assets/icons/icon-growth-bottom-nav-settings-01.png",
+    "transparent_required": true,
+    "cut_kind": "nav"
+  },
+  {
+    "id": "bottom-text-nav-labels",
+    "type": "text",
+    "source_image": "bottom",
+    "source_bbox": {
+      "x": 108,
+      "y": 1729,
+      "width": 642,
+      "height": 42
+    },
+    "scaled_bbox": {
+      "x": 95,
+      "y": 1520,
+      "width": 564,
+      "height": 37
+    },
+    "z_index": 23,
+    "text": "??  ??  ??  ??"
+  }
+]

@@ -1,14 +1,13 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, ImageBackground, Pressable, StyleSheet, Text, View } from "react-native";
-import { AppButton } from "@/components/common/AppButton";
-import { AppCard } from "@/components/common/AppCard";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppDialog } from "@/components/common/AppDialog";
 import { ReadyToSleepDialog } from "@/components/common/ReadyToSleepDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { buildHomeState, PRIMARY_TOOLS } from "@/features/home/homeViewModel";
 import type { HomeData } from "@/features/home/homeViewModel";
+import { completeReadyToSleepAfterRescue } from "@/features/rescue/readyToSleepUseCase";
 import {
   getAppStats,
   getLatestSleepRecord,
@@ -16,14 +15,12 @@ import {
   getRescueSessions,
   getTodaySession,
   getUserConfig,
-  markReadyToSleep,
   startTodaySessionWithNotice
 } from "@/storage/rescueSessionStorage";
 import { getSleepAudioSessionByDate } from "@/storage/sleepAudioStorage";
 import {
   getDailyExecutionRecordByDate,
   markNeedsCheckin,
-  markReadyToSleep as markExecutionReadyToSleep,
   markRitualStarted
 } from "@/storage/dailyExecutionStorage";
 import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
@@ -32,10 +29,11 @@ import { formatMinutes, minutesUntil, nowTime, todayKey } from "@/utils/date";
 import { useResponsiveMetrics } from "@/utils/responsive";
 import { getSuggestedRescueTime } from "@/utils/sleepPreferences";
 
-const recentChangeBackground = require("../assets/ui/recent-change-nightscape.png");
-const dreamIllustration = require("../assets/generated/sleep-generator-ui/assets/illustrations/illustration-sleep-generator-dream-01.png");
-const ritualCtaBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-home-ritual-cta-bg-254x76.png");
-const ritualPillBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-sleep-generator-top-pill-bg-clean.png");
+const homeMoonCloudIllustration = require("../assets/generated/yueban-home-ui/assets/illustrations/illustration-main-moon-cloud-01.png");
+const homeFeedbackNightscape = require("../assets/generated/yueban-home-ui/assets/images/image-feedback-nightscape-card-wide.png");
+const toolSpaIcon = require("../assets/generated/yueban-home-ui/assets/icons/icon-tool-spa-01.png");
+const toolChallengeIcon = require("../assets/generated/yueban-home-ui/assets/icons/icon-tool-challenge-01.png");
+const ritualCtaBackground = require("../assets/generated/sleep-generator-ui/assets/images/image-sleep-generator-cta-bg-clean.png");
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -43,41 +41,82 @@ function clampNumber(value: number, min: number, max: number) {
 
 export default function HomeScreen() {
   const metrics = useResponsiveMetrics();
-  const homeScale = clampNumber(metrics.contentWidth / 382, 0.82, 1);
-  const heroCardPadding = clampNumber(Math.round(metrics.contentWidth * 0.06), 16, 24);
-  const heroInnerWidth = Math.max(0, metrics.contentWidth - heroCardPadding * 2);
-  const heroImageSize = clampNumber(Math.round(heroInnerWidth * 0.48), 124, 174);
-  const heroImageRight = heroInnerWidth < 300 ? -2 : -4;
-  const heroImageLeft = heroInnerWidth - heroImageSize - heroImageRight;
-  const heroCopyWidth = clampNumber(Math.round(heroImageLeft - 10), 118, 186);
-  const heroTitleSize = clampNumber(Math.round(heroCopyWidth / 4.35), 28, 38);
-  const heroButtonWidth = clampNumber(Math.round(heroInnerWidth * 0.76), 208, 254);
-  const heroButtonHeight = clampNumber(Math.round(heroButtonWidth * 0.3), 62, 76);
+  const homeScale = clampNumber(metrics.contentWidth / 342, 0.86, 1);
+  const designScale = metrics.contentWidth / 665;
+  const scaleDesign = (value: number) => Math.round(value * designScale);
+  const scaleFont = (value: number, min: number, max: number) =>
+    clampNumber(Math.round(value * designScale), min, max);
   const heroLayout = {
-    headerTitleSize: clampNumber(Math.round(38 * homeScale), 31, 38),
-    headerTitleLineHeight: clampNumber(Math.round(44 * homeScale), 37, 44),
-    headerSubtitleSize: clampNumber(Math.round(17 * homeScale), 15, 17),
-    headerSubtitleLineHeight: clampNumber(Math.round(25 * homeScale), 22, 25),
-    heroCardPadding,
-    heroCardRadius: clampNumber(Math.round(42 * homeScale), 32, 42),
-    heroBodyMinHeight: Math.max(heroImageSize + 8, 150),
-    heroCopyWidth,
-    heroTitleSize,
-    heroTitleLineHeight: Math.round(heroTitleSize * 1.15),
-    heroBodySize: clampNumber(Math.round(15 * homeScale), 13, 15),
-    heroBodyLineHeight: clampNumber(Math.round(23 * homeScale), 20, 23),
-    heroImageRight,
-    heroImageSize,
-    heroImageRadius: Math.round(heroImageSize / 3),
-    heroImageInnerWidth: Math.round(heroImageSize * 1.06),
-    heroImageInnerHeight: Math.round(heroImageSize * 1.21),
-    heroImageInnerLeft: Math.round(-heroImageSize * 0.03),
-    heroImageInnerTop: Math.round(-heroImageSize * 0.075),
-    heroButtonWidth,
-    heroButtonHeight,
-    heroButtonRadius: Math.round(heroButtonHeight / 2),
-    goalGap: clampNumber(Math.round(14 * homeScale), 10, 14),
-    valueSize: clampNumber(Math.round(30 * homeScale), 25, 30)
+    headerTitleSize: clampNumber(Math.round(38 * homeScale), 32, 38),
+    headerTitleLineHeight: clampNumber(Math.round(44 * homeScale), 38, 44),
+    headerSubtitleSize: clampNumber(Math.round(15 * homeScale), 14, 15),
+    headerSubtitleLineHeight: clampNumber(Math.round(22 * homeScale), 20, 22),
+    cardInsetX: scaleDesign(37),
+    heroCardHeight: scaleDesign(535),
+    heroCardRadius: scaleDesign(42),
+    heroKickerTop: scaleDesign(39),
+    heroKickerSize: scaleFont(25, 12, 16),
+    heroKickerLineHeight: scaleDesign(31),
+    statusPillTop: scaleDesign(27),
+    statusPillRight: scaleDesign(33),
+    statusPillWidth: scaleDesign(139),
+    statusPillHeight: scaleDesign(45),
+    statusPillTextSize: scaleFont(25, 12, 15),
+    actionTitleTop: scaleDesign(119),
+    actionCopyWidth: scaleDesign(370),
+    heroTitleSize: scaleFont(52, 26, 31),
+    heroTitleLineHeight: scaleDesign(69),
+    heroBodySize: scaleFont(28, 13, 17),
+    heroBodyLineHeight: scaleDesign(38),
+    heroCopyGap: scaleDesign(14),
+    heroImageLeft: scaleDesign(375),
+    heroImageTop: scaleDesign(76),
+    heroImageWidth: scaleDesign(295),
+    heroImageHeight: scaleDesign(247),
+    ctaLeft: scaleDesign(37),
+    ctaWidth: scaleDesign(587),
+    primaryCtaTop: scaleDesign(324),
+    primaryCtaHeight: scaleDesign(95),
+    singlePrimaryCtaTop: scaleDesign(388),
+    secondaryCtaTop: scaleDesign(434),
+    secondaryCtaHeight: scaleDesign(78),
+    ctaTextSize: scaleFont(32, 15, 20),
+    secondaryTextSize: scaleFont(30, 14, 18),
+    timeCardHeight: scaleDesign(178),
+    timeCardRadius: scaleDesign(37),
+    timeLabelTop: scaleDesign(34),
+    timeValueTop: scaleDesign(73),
+    timeDividerTop: scaleDesign(40),
+    timeDividerHeight: scaleDesign(62),
+    timeDividerLeft: scaleDesign(212),
+    timeDividerRight: scaleDesign(406),
+    timeGoalLeft: scaleDesign(37),
+    timeSuggestLeft: scaleDesign(253),
+    timeLeftLeft: scaleDesign(428),
+    timeLabelSize: scaleFont(25, 12, 15),
+    valueSize: scaleFont(45, 21, 27),
+    compactValueSize: scaleFont(34, 18, 22),
+    timeProgressLeft: scaleDesign(37),
+    timeProgressTop: scaleDesign(133),
+    timeProgressWidth: scaleDesign(588),
+    timeProgressHeight: scaleDesign(18),
+    recentCardHeight: scaleDesign(202),
+    recentCardRadius: scaleDesign(30),
+    recentImageWidth: scaleDesign(665),
+    recentTitleTop: scaleDesign(37),
+    recentBodyTop: scaleDesign(144),
+    recentCopyWidth: scaleDesign(330),
+    recentTitleSize: scaleFont(31, 15, 20),
+    recentTitleLineHeight: scaleDesign(43),
+    recentBodySize: scaleFont(24, 12, 15),
+    recentBodyLineHeight: scaleDesign(35),
+    toolCardHeight: scaleDesign(121),
+    toolCardRadius: scaleDesign(28),
+    toolPaddingX: scaleDesign(15),
+    toolGap: scaleDesign(23),
+    toolIconSize: scaleDesign(93),
+    toolTextSize: scaleFont(31, 15, 20),
+    toolTextLineHeight: scaleDesign(40)
   };
   const [data, setData] = useState<HomeData | null>(null);
   const [clock, setClock] = useState(nowTime());
@@ -140,12 +179,17 @@ export default function HomeScreen() {
 
   const viewModel = useMemo(() => (data ? buildHomeState(data) : null), [data]);
   const targetTime = data?.userConfig.targetSleepTime ?? "23:30";
+  const countdownMinutes = minutesUntil(targetTime);
+  const countdownProgress = Math.max(6, Math.min(100, 100 - (countdownMinutes / (24 * 60)) * 100));
   const suggestedStart = data
     ? reminderEnabled
       ? getSuggestedRescueTime(data.userConfig.targetSleepTime, data.userConfig.reminderMinutesBefore)
       : "手动开始"
     : "23:00";
-  const countdownLabel = formatMinutes(minutesUntil(targetTime));
+  const countdownLabel = formatMinutes(countdownMinutes);
+  const homeCountdownLabel = countdownLabel
+    .replace(/(\d+)\s*小时\s*(\d+)\s*分钟/, "$1小时$2分")
+    .replace(/(\d+)\s*分钟/, "$1分");
 
   const handlePrimaryAction = async () => {
     if (!viewModel || viewModel.action.disabled) {
@@ -199,11 +243,12 @@ export default function HomeScreen() {
 
     setIsConfirmingReadyToSleep(true);
     try {
-      await Promise.all([
-        markReadyToSleep(),
-        markExecutionReadyToSleep()
-      ]);
+      const completed = await completeReadyToSleepAfterRescue();
       setShowReadyToSleepDialog(false);
+      if (!completed) {
+        router.push("/rescue");
+        return;
+      }
       await loadHomeData();
     } finally {
       setIsConfirmingReadyToSleep(false);
@@ -220,8 +265,10 @@ export default function HomeScreen() {
     );
   }
 
+  const hasSecondaryAction = Boolean(viewModel.secondaryAction);
+
   return (
-    <Screen>
+    <Screen contentStyle={styles.homeContent}>
       <View style={styles.top}>
         <View style={styles.time}>
           <View style={styles.dot} />
@@ -234,7 +281,14 @@ export default function HomeScreen() {
 
       <View style={[styles.header, metrics.contentWidth < 330 && styles.headerCompact]}>
         <Text style={styles.eyebrow}>今晚</Text>
-        <Text style={[styles.title, { fontSize: heroLayout.headerTitleSize, lineHeight: heroLayout.headerTitleLineHeight }]}>{viewModel.title}</Text>
+        <Text
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.9}
+          style={[styles.title, { fontSize: heroLayout.headerTitleSize, lineHeight: heroLayout.headerTitleLineHeight }]}
+        >
+          {viewModel.title}
+        </Text>
         <Text style={[styles.subtitle, { fontSize: heroLayout.headerSubtitleSize, lineHeight: heroLayout.headerSubtitleLineHeight }]}>{viewModel.subtitle}</Text>
       </View>
 
@@ -243,65 +297,95 @@ export default function HomeScreen() {
           styles.heroCard,
           {
             borderRadius: heroLayout.heroCardRadius,
-            paddingHorizontal: heroLayout.heroCardPadding,
-            paddingTop: heroLayout.heroCardPadding + 2,
-            paddingBottom: heroLayout.heroCardPadding + 4
+            minHeight: heroLayout.heroCardHeight,
+            height: heroLayout.heroCardHeight
           }
         ]}
       >
-        <View style={styles.statusRow}>
-          <Text style={[styles.label, styles.statusLabelText]}>当前最该做的一件事</Text>
-          <ImageBackground
-            source={ritualPillBackground}
-            resizeMode="stretch"
-            style={[styles.statusPill, metrics.contentWidth < 330 && styles.statusPillCompact]}
-            imageStyle={styles.statusPillImage}
-          >
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.statusPillText}>{viewModel.statusLabel}</Text>
-          </ImageBackground>
-        </View>
-        <View style={[styles.heroBody, { minHeight: heroLayout.heroBodyMinHeight }]}>
-          <View style={[styles.heroCopy, { width: heroLayout.heroCopyWidth }]}>
+        <Text
+          style={[
+            styles.label,
+            styles.heroKicker,
+            {
+              left: heroLayout.cardInsetX,
+              top: heroLayout.heroKickerTop,
+              fontSize: heroLayout.heroKickerSize,
+              lineHeight: heroLayout.heroKickerLineHeight
+            }
+          ]}
+        >
+          当前最该做的一件事
+        </Text>
+        <View
+          style={[
+            styles.statusPill,
+            {
+              right: heroLayout.statusPillRight,
+              top: heroLayout.statusPillTop,
+              width: heroLayout.statusPillWidth,
+              minHeight: heroLayout.statusPillHeight,
+              height: heroLayout.statusPillHeight,
+              borderRadius: heroLayout.statusPillHeight / 2,
+              paddingHorizontal: Math.max(6, scaleDesign(18))
+            }
+          ]}
+        >
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
               style={[
-                styles.actionTitle,
-                { fontSize: heroLayout.heroTitleSize, lineHeight: heroLayout.heroTitleLineHeight }
+                styles.statusPillText,
+                { fontSize: heroLayout.statusPillTextSize, lineHeight: Math.round(heroLayout.statusPillTextSize * 1.15) }
               ]}
             >
-              {viewModel.action.title}
+              {viewModel.statusLabel}
             </Text>
-            <Text style={[styles.body, { fontSize: heroLayout.heroBodySize, lineHeight: heroLayout.heroBodyLineHeight }]}>
-              {viewModel.action.description}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.dreamFrame,
-              {
-                right: heroLayout.heroImageRight,
-                width: heroLayout.heroImageSize,
-                height: heroLayout.heroImageSize,
-                borderRadius: heroLayout.heroImageRadius
-              }
-            ]}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Image
-              source={dreamIllustration}
-              style={[
-                styles.dreamImage,
-                {
-                  left: heroLayout.heroImageInnerLeft,
-                  top: heroLayout.heroImageInnerTop,
-                  width: heroLayout.heroImageInnerWidth,
-                  height: heroLayout.heroImageInnerHeight
-                }
-              ]}
-              resizeMode="stretch"
-            />
-          </View>
         </View>
+        <View
+          style={[
+            styles.heroCopy,
+            {
+              left: heroLayout.cardInsetX,
+              top: heroLayout.actionTitleTop,
+              width: heroLayout.actionCopyWidth,
+              gap: heroLayout.heroCopyGap
+            }
+          ]}
+        >
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.86}
+            style={[
+              styles.actionTitle,
+              { fontSize: heroLayout.heroTitleSize, lineHeight: heroLayout.heroTitleLineHeight }
+            ]}
+          >
+            {viewModel.action.title}
+          </Text>
+          <Text
+            numberOfLines={2}
+            style={[styles.body, { fontSize: heroLayout.heroBodySize, lineHeight: heroLayout.heroBodyLineHeight }]}
+          >
+            {viewModel.action.description}
+          </Text>
+        </View>
+        <Image
+          source={homeMoonCloudIllustration}
+          style={[
+            styles.heroIllustration,
+            {
+              left: heroLayout.heroImageLeft,
+              top: heroLayout.heroImageTop,
+              width: heroLayout.heroImageWidth,
+              height: heroLayout.heroImageHeight
+            }
+          ]}
+          resizeMode="contain"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
         <Pressable
           accessibilityRole="button"
           onPress={handlePrimaryAction}
@@ -310,90 +394,300 @@ export default function HomeScreen() {
           style={({ pressed }) => [
             styles.heroButton,
             {
-              width: heroLayout.heroButtonWidth,
-              height: heroLayout.heroButtonHeight,
-              borderRadius: heroLayout.heroButtonRadius
+              left: heroLayout.ctaLeft,
+              top: hasSecondaryAction ? heroLayout.primaryCtaTop : heroLayout.singlePrimaryCtaTop,
+              width: heroLayout.ctaWidth,
+              minHeight: heroLayout.primaryCtaHeight,
+              height: heroLayout.primaryCtaHeight,
+              borderRadius: heroLayout.primaryCtaHeight / 2
             },
             viewModel.action.disabled && styles.heroButtonDisabled,
             pressed && !viewModel.action.disabled && styles.pressed
           ]}
         >
-          <ImageBackground
+          <Image
             source={ritualCtaBackground}
             resizeMode="stretch"
-            style={styles.heroButtonBg}
-            imageStyle={styles.heroButtonImage}
+            style={styles.heroButtonImage}
+          />
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+            style={[
+              styles.heroButtonText,
+              { fontSize: heroLayout.ctaTextSize, lineHeight: Math.round(heroLayout.ctaTextSize * 1.22) },
+              viewModel.action.disabled && styles.heroButtonTextDisabled
+            ]}
           >
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.82}
-              style={[styles.heroButtonText, viewModel.action.disabled && styles.heroButtonTextDisabled]}
-            >
-              {viewModel.action.buttonTitle}
-            </Text>
-          </ImageBackground>
+            {viewModel.action.buttonTitle}
+          </Text>
         </Pressable>
         {viewModel.secondaryAction ? (
-          <AppButton
-            title={viewModel.secondaryAction.buttonTitle}
-            variant="secondary"
+          <Pressable
+            accessibilityRole="button"
             onPress={() => {
               if (viewModel.secondaryAction?.href) {
                 router.push(viewModel.secondaryAction.href);
               }
             }}
-            style={[styles.secondaryButton, { width: heroLayout.heroButtonWidth }]}
-            size="md"
-          />
+            renderToHardwareTextureAndroid={true}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                left: heroLayout.ctaLeft,
+                top: heroLayout.secondaryCtaTop,
+                width: heroLayout.ctaWidth,
+                height: heroLayout.secondaryCtaHeight,
+                borderRadius: heroLayout.secondaryCtaHeight / 2
+              },
+              pressed && styles.pressed
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+              style={[
+                styles.secondaryButtonText,
+                { fontSize: heroLayout.secondaryTextSize, lineHeight: Math.round(heroLayout.secondaryTextSize * 1.18) }
+              ]}
+            >
+              {viewModel.secondaryAction.buttonTitle}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
 
-      <View style={[styles.goalRow, { gap: heroLayout.goalGap }]}>
-        <View style={styles.mini}>
-          <Text style={styles.label}>目标睡觉</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.value, { fontSize: heroLayout.valueSize }]}>{targetTime}</Text>
-        </View>
-        <View style={styles.mini}>
-          <Text style={styles.label}>建议开始</Text>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={[styles.value, { fontSize: heroLayout.valueSize }]}>{suggestedStart}</Text>
+      <View
+        style={[
+          styles.timeStatusCard,
+          {
+            height: heroLayout.timeCardHeight,
+            minHeight: heroLayout.timeCardHeight,
+            borderRadius: heroLayout.timeCardRadius
+          }
+        ]}
+      >
+        <View
+          style={[
+            styles.timeDivider,
+            {
+              left: heroLayout.timeDividerLeft,
+              top: heroLayout.timeDividerTop,
+              height: heroLayout.timeDividerHeight
+            }
+          ]}
+        />
+        <View
+          style={[
+            styles.timeDivider,
+            {
+              left: heroLayout.timeDividerRight,
+              top: heroLayout.timeDividerTop,
+              height: heroLayout.timeDividerHeight
+            }
+          ]}
+        />
+        <Text
+          style={[
+            styles.timeLabel,
+            { left: heroLayout.timeGoalLeft, top: heroLayout.timeLabelTop, fontSize: heroLayout.timeLabelSize, lineHeight: Math.round(heroLayout.timeLabelSize * 1.12) }
+          ]}
+        >
+          目标
+        </Text>
+        <Text
+          style={[
+            styles.timeLabel,
+            { left: heroLayout.timeSuggestLeft, top: heroLayout.timeLabelTop, fontSize: heroLayout.timeLabelSize, lineHeight: Math.round(heroLayout.timeLabelSize * 1.12) }
+          ]}
+        >
+          建议
+        </Text>
+        <Text
+          style={[
+            styles.timeLabel,
+            { left: heroLayout.timeLeftLeft, top: heroLayout.timeLabelTop, fontSize: heroLayout.timeLabelSize, lineHeight: Math.round(heroLayout.timeLabelSize * 1.12) }
+          ]}
+        >
+          还差
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          style={[
+            styles.timeValue,
+            {
+              left: heroLayout.timeGoalLeft,
+              top: heroLayout.timeValueTop,
+              width: scaleDesign(160),
+              fontSize: heroLayout.valueSize,
+              lineHeight: Math.round(heroLayout.valueSize * 1.12)
+            }
+          ]}
+        >
+          {targetTime}
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.74}
+          style={[
+            styles.timeValue,
+            {
+              left: heroLayout.timeSuggestLeft,
+              top: heroLayout.timeValueTop,
+              width: scaleDesign(160),
+              fontSize: heroLayout.valueSize,
+              lineHeight: Math.round(heroLayout.valueSize * 1.12)
+            }
+          ]}
+        >
+          {suggestedStart}
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.62}
+          style={[
+            styles.timeValueStrong,
+            {
+              left: heroLayout.timeLeftLeft,
+              top: heroLayout.timeValueTop,
+              width: scaleDesign(220),
+              fontSize: heroLayout.compactValueSize,
+              lineHeight: Math.round(heroLayout.compactValueSize * 1.12)
+            }
+          ]}
+        >
+          {homeCountdownLabel}
+        </Text>
+        <View
+          style={[
+            styles.timeProgressTrack,
+            {
+              left: heroLayout.timeProgressLeft,
+              top: heroLayout.timeProgressTop,
+              width: heroLayout.timeProgressWidth,
+              height: heroLayout.timeProgressHeight,
+              borderRadius: heroLayout.timeProgressHeight / 2
+            }
+          ]}
+        >
+          <View style={[styles.timeProgressFill, { width: `${countdownProgress}%` }]} />
         </View>
       </View>
 
-      <AppCard tone="cool">
-        <View style={styles.statusRow}>
-          <Text style={styles.label}>距离目标睡觉</Text>
-          <Text style={styles.countdown}>{countdownLabel}</Text>
-        </View>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${Math.max(6, Math.min(100, 100 - (minutesUntil(targetTime) / (24 * 60)) * 100))}%` }
-            ]}
-          />
-        </View>
-      </AppCard>
-
-      <ImageBackground source={recentChangeBackground} style={styles.recentCard} imageStyle={styles.recentImage}>
+      <View
+        style={[
+          styles.recentCard,
+          {
+            height: heroLayout.recentCardHeight,
+            borderRadius: heroLayout.recentCardRadius
+          }
+        ]}
+      >
+        <Image
+          source={homeFeedbackNightscape}
+          style={[
+            styles.recentImage,
+            {
+              width: heroLayout.recentImageWidth,
+              height: heroLayout.recentCardHeight,
+              borderRadius: heroLayout.recentCardRadius
+            }
+          ]}
+          resizeMode="cover"
+        />
         <View style={styles.recentScrim} />
-        <View style={styles.recentCopy}>
-          <Text style={styles.recentQuote}>{viewModel.changeQuote}</Text>
-          <Text style={styles.recentBody}>{viewModel.changeBody}</Text>
+        <View
+          style={[
+            styles.recentCopy,
+            {
+              left: heroLayout.cardInsetX,
+              top: heroLayout.recentTitleTop,
+              width: heroLayout.recentCopyWidth
+            }
+          ]}
+        >
+          <Text
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.88}
+            style={[
+              styles.recentQuote,
+              { fontSize: heroLayout.recentTitleSize, lineHeight: heroLayout.recentTitleLineHeight }
+            ]}
+          >
+            {viewModel.changeQuote}
+          </Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.86}
+            style={[
+              styles.recentBody,
+              {
+                top: heroLayout.recentBodyTop - heroLayout.recentTitleTop,
+                fontSize: heroLayout.recentBodySize,
+                lineHeight: heroLayout.recentBodyLineHeight
+              }
+            ]}
+          >
+            {viewModel.changeBody}
+          </Text>
         </View>
-      </ImageBackground>
+      </View>
 
-      <View style={styles.toolRow}>
+      <View style={[styles.toolRow, { gap: scaleDesign(25) }]}>
         {PRIMARY_TOOLS.map((tool) => (
           <Pressable
             key={tool.href}
             onPress={() => router.push(tool.href)}
-            style={({ pressed }) => [styles.tool, tool.tone === "cool" ? styles.toolCool : styles.toolWarm, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.tool,
+              tool.tone === "cool" ? styles.toolCool : styles.toolWarm,
+              {
+                height: heroLayout.toolCardHeight,
+                minHeight: heroLayout.toolCardHeight,
+                borderRadius: heroLayout.toolCardRadius,
+                paddingLeft: heroLayout.toolPaddingX,
+                paddingRight: heroLayout.toolPaddingX,
+                paddingVertical: 0,
+                gap: heroLayout.toolGap
+              },
+              pressed && styles.pressed
+            ]}
           >
-            <View style={styles.toolIcon}>
-              <Text style={styles.toolIconText}>{tool.icon}</Text>
+            <View
+              style={[
+                styles.toolIcon,
+                {
+                  width: heroLayout.toolIconSize,
+                  height: heroLayout.toolIconSize,
+                  borderRadius: heroLayout.toolIconSize / 2
+                }
+              ]}
+            >
+              <Image
+                source={tool.title === "声音 Spa" ? toolSpaIcon : toolChallengeIcon}
+                style={styles.toolIconImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.toolText}>{tool.title}</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+              style={[
+                styles.toolText,
+                { fontSize: heroLayout.toolTextSize, lineHeight: heroLayout.toolTextLineHeight }
+              ]}
+            >
+              {tool.title}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -415,6 +709,9 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  homeContent: {
+    gap: 16
+  },
   loading: {
     flex: 1,
     minHeight: 420,
@@ -469,10 +766,10 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   header: {
-    gap: 10
+    gap: 8
   },
   headerCompact: {
-    gap: 8
+    gap: 6
   },
   eyebrow: {
     color: colors.accent,
@@ -494,25 +791,29 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   heroCard: {
-    minHeight: 326,
-    borderRadius: 42,
+    minHeight: 286,
+    borderRadius: 32,
     borderWidth: 1,
-    borderColor: "#6D665F",
-    backgroundColor: "#2A2834",
-    paddingHorizontal: 24,
-    paddingTop: 26,
-    paddingBottom: 28,
-    gap: 20,
-    overflow: "hidden"
+    borderColor: "rgba(235, 218, 189, 0.42)",
+    backgroundColor: "#1F202B",
+    position: "relative",
+    overflow: "hidden",
+    shadowColor: "#000000",
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 5
   },
   heroBody: {
-    minHeight: 150,
+    minHeight: 140,
     justifyContent: "center",
     position: "relative"
   },
   heroCopy: {
+    position: "absolute",
     width: 186,
-    gap: 12
+    gap: 9,
+    zIndex: 2
   },
   statusRow: {
     flexDirection: "row",
@@ -528,30 +829,35 @@ const styles = StyleSheet.create({
   statusLabelText: {
     flex: 1
   },
+  heroKicker: {
+    position: "absolute",
+    zIndex: 3
+  },
   statusPill: {
-    width: 86,
-    height: 36,
+    position: "absolute",
+    width: 100,
+    minHeight: 40,
+    borderRadius: 20,
+    backgroundColor: "#F3D9AA",
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden"
+    paddingHorizontal: 12
   },
   statusPillCompact: {
-    width: 78,
-    height: 34
-  },
-  statusPillImage: {
-    borderRadius: 18
+    width: 88,
+    minHeight: 34,
+    paddingHorizontal: 9
   },
   statusPillText: {
-    color: colors.accent,
-    fontSize: 12,
-    lineHeight: 16,
+    color: colors.buttonText,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: "900"
   },
   actionTitle: {
     color: colors.ink,
-    fontSize: 38,
-    lineHeight: 44,
+    fontSize: 34,
+    lineHeight: 40,
     fontWeight: "900"
   },
   body: {
@@ -560,39 +866,25 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     fontWeight: "700"
   },
-  dreamFrame: {
+  heroIllustration: {
     position: "absolute",
-    right: -4,
-    top: -2,
-    width: 174,
-    height: 174,
-    borderRadius: 58,
-    backgroundColor: "#242432",
-    borderWidth: 1,
-    borderColor: "#3D3B4D",
-    overflow: "hidden"
-  },
-  dreamImage: {
-    position: "absolute",
-    left: -5,
-    top: -13,
-    width: 184,
-    height: 211
+    zIndex: 1
   },
   heroButton: {
+    position: "absolute",
     width: 254,
-    height: 76,
+    minHeight: 64,
     borderRadius: 38,
-    alignSelf: "flex-start",
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
     overflow: "hidden"
   },
-  heroButtonBg: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center"
-  },
   heroButtonImage: {
-    borderRadius: 38
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+    borderRadius: 999
   },
   heroButtonText: {
     color: colors.buttonText,
@@ -607,64 +899,105 @@ const styles = StyleSheet.create({
     color: colors.ink
   },
   secondaryButton: {
+    position: "absolute",
     width: 254,
-    alignSelf: "flex-start"
-  },
-  goalRow: {
-    flexDirection: "row",
-    gap: 14
-  },
-  mini: {
-    flex: 1,
-    minHeight: 104,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.line,
-    padding: 18,
-    justifyContent: "space-between"
+    borderColor: "rgba(255, 255, 255, 0.09)",
+    backgroundColor: "rgba(19, 20, 34, 0.62)"
   },
-  value: {
-    color: colors.accent,
-    fontSize: 30,
+  secondaryButtonText: {
+    color: "rgba(190, 188, 214, 0.88)",
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: "900"
   },
-  countdown: {
-    color: colors.ink,
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  progressTrack: {
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: colors.line,
+  timeStatusCard: {
+    minHeight: 112,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: colors.surfaceCool,
+    position: "relative",
     overflow: "hidden"
   },
-  progressFill: {
+  timeStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  timeStat: {
+    flex: 0.95,
+    minWidth: 0,
+    gap: 7
+  },
+  timeStatSuggest: {
+    flex: 1.1
+  },
+  timeStatWide: {
+    flex: 1.42
+  },
+  timeDivider: {
+    position: "absolute",
+    width: 1,
+    height: 52,
+    backgroundColor: "rgba(255, 255, 255, 0.18)"
+  },
+  timeLabel: {
+    position: "absolute",
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  timeValue: {
+    position: "absolute",
+    color: colors.accent,
+    fontSize: 26,
+    fontWeight: "900"
+  },
+  timeValueStrong: {
+    position: "absolute",
+    color: colors.ink,
+    fontSize: 23,
+    fontWeight: "900"
+  },
+  timeProgressTrack: {
+    position: "absolute",
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(59, 60, 82, 0.72)",
+    overflow: "hidden"
+  },
+  timeProgressFill: {
     height: "100%",
     borderRadius: 999,
     backgroundColor: colors.primary
   },
   recentCard: {
-    height: 178,
-    borderRadius: 24,
+    height: 164,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: "rgba(84, 85, 124, 0.42)",
+    borderColor: "rgba(137, 145, 255, 0.24)",
     overflow: "hidden",
+    position: "relative",
     justifyContent: "flex-start",
-    backgroundColor: colors.surfaceCool,
+    backgroundColor: "#181B38",
     shadowColor: "#000000",
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.32,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
     elevation: 6
   },
   recentImage: {
-    width: "116%",
-    height: "138%",
-    left: "-8%",
-    top: "-19%",
-    borderRadius: 24
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: "100%",
+    height: "100%",
+    borderRadius: 26
   },
   recentScrim: {
     position: "absolute",
@@ -672,14 +1005,13 @@ const styles = StyleSheet.create({
     right: -2,
     top: -2,
     bottom: -2,
-    backgroundColor: "rgba(5, 6, 18, 0.04)"
+    backgroundColor: "rgba(5, 6, 18, 0.06)"
   },
   recentCopy: {
-    width: "68%",
-    paddingLeft: 22,
-    paddingTop: 30,
-    paddingBottom: 20,
-    gap: 14
+    position: "absolute",
+    width: "66%",
+    gap: 12,
+    zIndex: 2
   },
   recentQuote: {
     color: "#FFF1CF",
@@ -688,6 +1020,8 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   recentBody: {
+    position: "absolute",
+    left: 0,
     color: "rgba(230, 234, 255, 0.72)",
     fontSize: 14,
     lineHeight: 21,
@@ -699,12 +1033,13 @@ const styles = StyleSheet.create({
   },
   tool: {
     flex: 1,
-    minHeight: 96,
     borderRadius: 24,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: 18,
-    justifyContent: "space-between"
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    overflow: "hidden"
   },
   toolCool: {
     backgroundColor: colors.surfaceCool
@@ -713,21 +1048,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceWarm
   },
   toolIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#303143",
     alignItems: "center",
     justifyContent: "center"
   },
-  toolIconText: {
-    color: colors.accent,
-    fontSize: 17,
-    fontWeight: "900"
+  toolIconImage: {
+    width: "100%",
+    height: "100%"
   },
   toolText: {
     color: colors.ink,
-    fontSize: 17,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 19,
+    lineHeight: 24,
     fontWeight: "900"
   },
   pressed: {

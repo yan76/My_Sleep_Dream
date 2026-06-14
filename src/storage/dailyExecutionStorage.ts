@@ -24,6 +24,7 @@ import {
   MorningMood,
   SleepAidPreference
 } from "@/types/app";
+import { dailyCycleHasCompletedReview } from "@/utils/dailyCycle";
 
 type StoredDailyExecutionRecords = Record<string, DailyExecutionRecord>;
 
@@ -233,6 +234,7 @@ export async function markSleepAidStarted(input: SleepAidInput = {}, date?: stri
   const targetDate = await resolveExecutionDate(date);
   const current = await ensureDailyExecutionRecord(targetDate);
   const aid = input.aid;
+  const canAdvanceToSleepAidStep = dailyCycleHasCompletedReview(current);
   const record = await updateExecutionRecord(
     targetDate,
     {
@@ -241,14 +243,21 @@ export async function markSleepAidStarted(input: SleepAidInput = {}, date?: stri
       usedTreeHole: current.usedTreeHole || aid === "tree_hole",
       usedSleepGenerator: true
     },
-    "sleep_aid_started"
+    canAdvanceToSleepAidStep ? "sleep_aid_started" : undefined
   );
   trackAppEvent("sleep_aid_used", { date: targetDate, aid: typeof aid === "string" ? aid : "unknown" }).catch(() => undefined);
   return record;
 }
 
 export async function markReadyToSleep(date?: string): Promise<DailyExecutionRecord> {
-  return updateExecutionRecord(await resolveExecutionDate(date), { readyToSleepAt: nowIso() }, "ready_to_sleep");
+  const targetDate = await resolveExecutionDate(date);
+  const current = await readExecutionRecord(targetDate);
+
+  if (!dailyCycleHasCompletedReview(current)) {
+    throw new Error("Cannot mark ready to sleep before completing today's rescue review.");
+  }
+
+  return updateExecutionRecord(targetDate, { readyToSleepAt: nowIso() }, "ready_to_sleep");
 }
 
 export async function markNeedsCheckin(date: string): Promise<DailyExecutionRecord> {

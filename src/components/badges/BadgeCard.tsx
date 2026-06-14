@@ -1,25 +1,28 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { AppCard } from "@/components/common/AppCard";
-import { Badge } from "@/types/app";
 import { colors } from "@/constants/colors";
+import type { AchievementBadge } from "@/features/badges/badgeData";
 
-export function BadgeCard({ badge }: { badge: Badge }) {
+export function BadgeCard({ badge }: { badge: AchievementBadge }) {
+  const progressPercent = `${Math.min(100, Math.round((badge.progressCurrent / badge.progressTarget) * 100))}%` as `${number}%`;
+
   return (
     <AppCard tone={badge.unlocked ? "warm" : "plain"} style={!badge.unlocked ? styles.locked : undefined}>
       <View style={styles.header}>
-        <View style={[styles.badgeIcon, badge.unlocked && styles.badgeIconActive]}>
-          <Text style={styles.badgeEmoji}>
-            {badge.unlocked ? "✦" : "☆"}
-          </Text>
+        <View style={styles.badgeIcon}>
+          <Image source={badge.image} style={styles.badgeImage} resizeMode="contain" />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.title}>{badge.title}</Text>
           <Text style={styles.status}>
-            {badge.unlocked ? "已解锁 ✓" : "未解锁"}
+            {badge.unlocked ? "已经做到" : badge.progressLabel}
           </Text>
         </View>
       </View>
-      <Text style={styles.description}>{badge.description}</Text>
+      <Text style={styles.description}>{badge.unlocked ? badge.description : badge.lockedDescription}</Text>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: progressPercent }]} />
+      </View>
       {badge.unlockedAt ? (
         <Text style={styles.date}>{badge.unlockedAt.slice(0, 10)} 获得</Text>
       ) : null}
@@ -37,19 +40,15 @@ const styles = StyleSheet.create({
     gap: 14
   },
   badgeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surfaceStrong,
+    width: 82,
+    height: 82,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    overflow: "visible"
   },
-  badgeIconActive: {
-    backgroundColor: colors.accent + "40"
-  },
-  badgeEmoji: {
-    fontSize: 22,
-    color: colors.accent
+  badgeImage: {
+    width: 82,
+    height: 82
   },
   headerText: {
     flex: 1,
@@ -69,6 +68,17 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 15,
     lineHeight: 22
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceStrong,
+    overflow: "hidden"
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 4,
+    backgroundColor: colors.accent
   },
   date: {
     color: colors.accent,

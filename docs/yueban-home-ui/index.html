@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>早睡自救局首页 750px 还原</title>
+    <style>
+      :root {
+        --bg: #070918;
+        --ink: #f7f8ff;
+        --muted: #aaaec4;
+        --cream: #f4dbad;
+        --blue: #8991ff;
+        --line: rgba(255, 255, 255, 0.24);
+        --card: rgba(25, 25, 33, 0.92);
+        --font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: start center;
+        background: #050711;
+        font-family: var(--font);
+      }
+
+      .artboard {
+        position: relative;
+        width: 750px;
+        height: 1625px;
+        overflow: hidden;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 6%, rgba(39, 55, 99, 0.2) 0, transparent 22%),
+          radial-gradient(circle at 86% 30%, rgba(43, 47, 91, 0.28) 0, transparent 30%),
+          linear-gradient(180deg, #080a19 0%, #060816 100%);
+      }
+
+      .layer {
+        position: absolute;
+      }
+
+      .orbit-outer {
+        left: 459px;
+        top: -37px;
+        width: 370px;
+        height: 484px;
+        border: 62px solid rgba(41, 48, 92, 0.46);
+        border-radius: 50%;
+      }
+
+      .orbit-inner {
+        left: 607px;
+        top: 4px;
+        width: 198px;
+        height: 298px;
+        border-radius: 50%;
+        background: rgba(33, 39, 81, 0.48);
+      }
+
+      .dot {
+        left: 44px;
+        top: 62px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #75e6bd;
+      }
+
+      .clock {
+        left: 74px;
+        top: 50px;
+        font-size: 36px;
+        line-height: 43px;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .settings {
+        left: 600px;
+        top: 40px;
+        width: 114px;
+        height: 62px;
+        border-radius: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        background: rgba(28, 30, 49, 0.78);
+        box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.04);
+        display: grid;
+        place-items: center;
+        font-size: 27px;
+        line-height: 28px;
+        font-weight: 900;
+      }
+
+      .eyebrow {
+        left: 45px;
+        top: 143px;
+        color: var(--cream);
+        font-size: 28px;
+        line-height: 32px;
+        font-weight: 900;
+      }
+
+      .hero-title {
+        left: 43px;
+        top: 196px;
+        width: 520px;
+        font-size: 58px;
+        line-height: 70px;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .hero-subtitle {
+        left: 45px;
+        top: 283px;
+        width: 548px;
+        color: var(--muted);
+        font-size: 26px;
+        line-height: 37px;
+        font-weight: 800;
+      }
+
+      .main-card {
+        left: 43px;
+        top: 347px;
+        width: 665px;
+        height: 535px;
+        border-radius: 42px;
+        border: 1px solid rgba(244, 230, 205, 0.5);
+        background:
+          radial-gradient(circle at 74% 33%, rgba(87, 87, 111, 0.25) 0, transparent 36%),
+          linear-gradient(120deg, rgba(32, 32, 40, 0.98) 0%, rgba(26, 26, 34, 0.96) 54%, rgba(28, 28, 39, 0.98) 100%);
+        box-shadow:
+          0 18px 46px rgba(0, 0, 0, 0.34),
+          inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+
+      .card-kicker {
+        left: 80px;
+        top: 386px;
+        color: var(--cream);
+        font-size: 25px;
+        line-height: 31px;
+        font-weight: 900;
+      }
+
+      .pill {
+        left: 536px;
+        top: 374px;
+        width: 139px;
+        height: 45px;
+        border-radius: 24px;
+        background: linear-gradient(105deg, #f7deb1 0%, #f7e3bd 72%, #ffe6b2 100%);
+        display: grid;
+        place-items: center;
+        color: #10111b;
+        font-size: 25px;
+        line-height: 28px;
+        font-weight: 900;
+      }
+
+      .action-title {
+        left: 80px;
+        top: 466px;
+        font-size: 57px;
+        line-height: 69px;
+        font-weight: 900;
+      }
+
+      .desc {
+        left: 80px;
+        color: #afb2c8;
+        font-size: 28px;
+        line-height: 38px;
+        font-weight: 800;
+      }
+
+      .desc.one {
+        top: 553px;
+      }
+
+      .desc.two {
+        top: 599px;
+      }
+
+      .main-illustration {
+        left: 418px;
+        top: 423px;
+        width: 295px;
+        height: 247px;
+        object-fit: contain;
+      }
+
+      .primary-cta {
+        left: 80px;
+        top: 671px;
+        width: 587px;
+        height: 95px;
+        border-radius: 50px;
+        background: linear-gradient(100deg, #f6d9a8 0%, #f2eadf 43%, #a4a6ff 100%);
+        display: grid;
+        place-items: center;
+        color: #080916;
+        font-size: 32px;
+        line-height: 36px;
+        font-weight: 900;
+        box-shadow: 0 18px 40px rgba(84, 94, 186, 0.22);
+      }
+
+      .secondary-cta {
+        left: 80px;
+        top: 781px;
+        width: 587px;
+        height: 78px;
+        border-radius: 42px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(25, 26, 42, 0.64);
+        display: grid;
+        place-items: center;
+        color: rgba(176, 175, 202, 0.86);
+        font-size: 30px;
+        line-height: 34px;
+        font-weight: 900;
+      }
+
+      .status-panel {
+        left: 43px;
+        top: 897px;
+        width: 665px;
+        height: 178px;
+        border-radius: 37px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background:
+          radial-gradient(circle at 10% 34%, rgba(44, 63, 116, 0.16) 0, transparent 34%),
+          linear-gradient(105deg, rgba(22, 25, 44, 0.98), rgba(17, 18, 32, 0.98));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .separator {
+        width: 2px;
+        height: 62px;
+        top: 937px;
+        background: rgba(255, 255, 255, 0.24);
+      }
+
+      .separator.left {
+        left: 255px;
+      }
+
+      .separator.right {
+        left: 449px;
+      }
+
+      .status-label {
+        top: 931px;
+        color: #aeb2c8;
+        font-size: 25px;
+        line-height: 28px;
+        font-weight: 900;
+      }
+
+      .goal-label {
+        left: 80px;
+      }
+
+      .suggest-label {
+        left: 296px;
+      }
+
+      .left-label {
+        left: 489px;
+      }
+
+      .status-value {
+        top: 970px;
+        font-size: 45px;
+        line-height: 50px;
+        font-weight: 900;
+      }
+
+      .goal-value,
+      .suggest-value {
+        color: var(--cream);
+      }
+
+      .goal-value {
+        left: 80px;
+      }
+
+      .suggest-value {
+        left: 296px;
+      }
+
+      .left-value {
+        left: 489px;
+        color: var(--ink);
+        font-size: 40px;
+      }
+
+      .progress-track {
+        left: 80px;
+        top: 1030px;
+        width: 588px;
+        height: 18px;
+        border-radius: 9px;
+        background: rgba(60, 59, 80, 0.76);
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        width: 401px;
+        height: 18px;
+        border-radius: 9px;
+        background: linear-gradient(90deg, #b8a7ff 0%, #8c94ff 100%);
+        box-shadow: 0 0 16px rgba(150, 152, 255, 0.5);
+      }
+
+      .feedback-card {
+        left: 43px;
+        top: 1091px;
+        width: 665px;
+        height: 202px;
+        border-radius: 30px;
+        border: 1px solid rgba(137, 145, 255, 0.28);
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 22% 23%, rgba(91, 81, 160, 0.32) 0, transparent 35%),
+          linear-gradient(110deg, #181b38 0%, #1b1f42 47%, #1a2043 100%);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+      }
+
+      .feedback-image {
+        left: 379px;
+        top: 1091px;
+        width: 328px;
+        height: 202px;
+        object-fit: cover;
+      }
+
+      .feedback-scrim {
+        left: 43px;
+        top: 1091px;
+        width: 665px;
+        height: 202px;
+        border-radius: 30px;
+        background: linear-gradient(90deg, rgba(15, 17, 34, 0.9) 0%, rgba(15, 17, 34, 0.55) 42%, rgba(15, 17, 34, 0.03) 100%);
+      }
+
+      .feedback-title {
+        left: 80px;
+        top: 1128px;
+        width: 360px;
+        color: #ffedc8;
+        font-size: 31px;
+        line-height: 43px;
+        font-weight: 900;
+      }
+
+      .feedback-body {
+        left: 80px;
+        top: 1235px;
+        width: 330px;
+        color: rgba(225, 229, 252, 0.76);
+        font-size: 24px;
+        line-height: 35px;
+        font-weight: 800;
+      }
+
+      .tool-card {
+        top: 1312px;
+        width: 320px;
+        height: 121px;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background:
+          radial-gradient(circle at 20% 15%, rgba(89, 98, 170, 0.18) 0, transparent 48%),
+          linear-gradient(110deg, #171c32 0%, #14182b 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .tool-card.left {
+        left: 43px;
+      }
+
+      .tool-card.right {
+        left: 388px;
+      }
+
+      .tool-icon-spa {
+        left: 58px;
+        top: 1327px;
+        width: 93px;
+        height: 93px;
+      }
+
+      .tool-icon-challenge {
+        left: 403px;
+        top: 1327px;
+        width: 93px;
+        height: 93px;
+      }
+
+      .tool-text {
+        top: 1359px;
+        color: var(--ink);
+        font-size: 31px;
+        line-height: 40px;
+        font-weight: 900;
+      }
+
+      .tool-text.spa {
+        left: 174px;
+      }
+
+      .tool-text.challenge {
+        left: 521px;
+      }
+
+      .bottom-nav {
+        left: 6px;
+        top: 1457px;
+        width: 738px;
+        height: 168px;
+        border-radius: 62px 62px 0 0;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(6, 8, 20, 0.96);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 -16px 34px rgba(0, 0, 0, 0.26);
+      }
+
+      .nav-icon {
+        object-fit: contain;
+      }
+
+      .nav-home-icon {
+        left: 85px;
+        top: 1474px;
+        width: 72px;
+        height: 70px;
+      }
+
+      .nav-rescue-icon {
+        left: 250px;
+        top: 1474px;
+        width: 83px;
+        height: 70px;
+      }
+
+      .nav-growth-icon {
+        left: 428px;
+        top: 1474px;
+        width: 74px;
+        height: 70px;
+      }
+
+      .nav-settings-icon {
+        left: 599px;
+        top: 1474px;
+        width: 76px;
+        height: 70px;
+      }
+
+      .nav-label {
+        top: 1554px;
+        width: 48px;
+        text-align: center;
+        font-size: 24px;
+        line-height: 31px;
+        font-weight: 900;
+        color: #9fa3c0;
+      }
+
+      .nav-label.active {
+        color: #f6dcae;
+      }
+
+      .nav-home-label {
+        left: 98px;
+      }
+
+      .nav-rescue-label {
+        left: 269px;
+      }
+
+      .nav-growth-label {
+        left: 441px;
+      }
+
+      .nav-settings-label {
+        left: 613px;
+      }
+
+      .home-indicator {
+        left: 234px;
+        top: 1604px;
+        width: 282px;
+        height: 11px;
+        border-radius: 999px;
+        background: #f7f7f8;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="artboard" aria-label="早睡自救局首页 750px 还原">
+      <div class="layer orbit-outer" data-layer-id="background-orbit-outer"></div>
+      <div class="layer orbit-inner" data-layer-id="background-orbit-inner"></div>
+
+      <div class="layer dot" data-layer-id="status-dot"></div>
+      <div class="layer clock" data-layer-id="text-clock">21:45</div>
+      <div class="layer settings" data-layer-id="settings-button">设置</div>
+
+      <div class="layer eyebrow" data-layer-id="text-eyebrow">今晚</div>
+      <div class="layer hero-title" data-layer-id="text-hero-title">补录一下昨晚结果</div>
+      <div class="layer hero-subtitle" data-layer-id="text-hero-subtitle">几十秒就好，这会帮你看见自己正在变好。</div>
+
+      <section class="layer main-card" data-layer-id="main-action-card"></section>
+      <div class="layer card-kicker" data-layer-id="text-card-kicker">当前最该做的一件事</div>
+      <div class="layer pill" data-layer-id="status-pill">次日打卡</div>
+      <div class="layer action-title" data-layer-id="text-action-title">开始次日打卡</div>
+      <div class="layer desc one" data-layer-id="text-action-desc-line-1">昨晚有声音线索，</div>
+      <div class="layer desc two" data-layer-id="text-action-desc-line-2">打卡后可以一起看看。</div>
+      <img
+        class="layer main-illustration"
+        data-layer-id="illustration-main-moon-cloud"
+        src="../../assets/generated/yueban-home-ui/assets/illustrations/illustration-main-moon-cloud-01.png"
+        alt=""
+      />
+      <div class="layer primary-cta" data-layer-id="primary-cta">开始次日打卡</div>
+      <div class="layer secondary-cta" data-layer-id="secondary-cta">开始睡眠监听</div>
+
+      <section class="layer status-panel" data-layer-id="time-status-panel"></section>
+      <div class="layer separator left" data-layer-id="time-separator-left"></div>
+      <div class="layer separator right" data-layer-id="time-separator-right"></div>
+      <div class="layer status-label goal-label" data-layer-id="text-goal-label">目标</div>
+      <div class="layer status-label suggest-label" data-layer-id="text-suggest-label">建议</div>
+      <div class="layer status-label left-label" data-layer-id="text-left-label">还差</div>
+      <div class="layer status-value goal-value" data-layer-id="text-goal-value">23:30</div>
+      <div class="layer status-value suggest-value" data-layer-id="text-suggest-value">23:00</div>
+      <div class="layer status-value left-value" data-layer-id="text-left-value">1小时 44 分</div>
+      <div class="layer progress-track" data-layer-id="progress-track">
+        <div class="progress-fill" data-layer-id="progress-fill"></div>
+      </div>
+
+      <section class="layer feedback-card" data-layer-id="feedback-card"></section>
+      <img
+        class="layer feedback-image"
+        data-layer-id="image-feedback-nightscape"
+        src="../../assets/generated/yueban-home-ui/assets/images/image-feedback-nightscape-01.png"
+        alt=""
+      />
+      <div class="layer feedback-scrim"></div>
+      <div class="layer feedback-title" data-layer-id="text-feedback-title">这周你已经 1 次主动<br />开始睡前仪式。</div>
+      <div class="layer feedback-body" data-layer-id="text-feedback-body">你正在把夜晚一点点拿回来。</div>
+
+      <section class="layer tool-card left" data-layer-id="tool-card-spa"></section>
+      <section class="layer tool-card right" data-layer-id="tool-card-challenge"></section>
+      <img
+        class="layer tool-icon-spa"
+        data-layer-id="icon-tool-spa"
+        src="../../assets/generated/yueban-home-ui/assets/icons/icon-tool-spa-01.png"
+        alt=""
+      />
+      <img
+        class="layer tool-icon-challenge"
+        data-layer-id="icon-tool-challenge"
+        src="../../assets/generated/yueban-home-ui/assets/icons/icon-tool-challenge-01.png"
+        alt=""
+      />
+      <div class="layer tool-text spa" data-layer-id="text-tool-spa">声音 Spa</div>
+      <div class="layer tool-text challenge" data-layer-id="text-tool-challenge">下线挑战</div>
+
+      <nav class="layer bottom-nav" data-layer-id="bottom-nav" aria-label="底部导航"></nav>
+      <img
+        class="layer nav-icon nav-home-icon"
+        data-layer-id="icon-nav-home"
+        src="../../assets/generated/yueban-home-ui/assets/icons/icon-nav-home-01.png"
+        alt=""
+      />
+      <img
+        class="layer nav-icon nav-rescue-icon"
+        data-layer-id="icon-nav-rescue"
+        src="../../assets/generated/yueban-home-ui/assets/icons/icon-nav-rescue-01.png"
+        alt=""
+      />
+      <img
+        class="layer nav-icon nav-growth-icon"
+        data-layer-id="icon-nav-growth"
+        src="../../assets/generated/yueban-home-ui/assets/icons/icon-nav-growth-01.png"
+        alt=""
+      />
+      <img
+        class="layer nav-icon nav-settings-icon"
+        data-layer-id="icon-nav-settings"
+        src="../../assets/generated/yueban-home-ui/assets/icons/icon-nav-settings-01.png"
+        alt=""
+      />
+      <div class="layer nav-label nav-home-label active" data-layer-id="text-nav-home">首页</div>
+      <div class="layer nav-label nav-rescue-label" data-layer-id="text-nav-rescue">自救</div>
+      <div class="layer nav-label nav-growth-label" data-layer-id="text-nav-growth">成长</div>
+      <div class="layer nav-label nav-settings-label" data-layer-id="text-nav-settings">设置</div>
+      <div class="layer home-indicator" data-layer-id="home-indicator"></div>
+    </main>
+  </body>
+</html>

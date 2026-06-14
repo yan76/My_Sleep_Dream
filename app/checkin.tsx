@@ -5,6 +5,7 @@ import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
 import { TimePickerField } from "@/components/common/TimePickerField";
+import { SleepAudioSummaryCard } from "@/components/sleep-audio/SleepAudioSummaryCard";
 import { colors } from "@/constants/colors";
 import { lateNightReasons } from "@/constants/reasons";
 import {
@@ -189,13 +190,7 @@ export default function CheckinScreen() {
         </View>
       </AppCard>
 
-      <AppCard tone="cool">
-        <View style={styles.statusRow}>
-          <Text style={styles.label}>昨晚声音线索</Text>
-          <Text style={styles.statusPill}>{audioStatusLabel(audioSession)}</Text>
-        </View>
-        <Text style={styles.body}>{audioSummary(audioSession)}</Text>
-      </AppCard>
+      <SleepAudioSummaryCard session={audioSession} onDeleted={() => setAudioSession(null)} />
 
       <View style={styles.actionStack}>
         {validationMessage ? <Text style={styles.error}>{validationMessage}</Text> : null}
@@ -215,44 +210,6 @@ function sleepResultLabel(result: ReturnType<typeof classifySleepResult>): strin
   }
 
   return "晚了很多";
-}
-
-function audioStatusLabel(session: SleepAudioSession | null): string {
-  if (!session) {
-    return "未开启";
-  }
-
-  if (session.status === "permission_denied") {
-    return "未授权";
-  }
-
-  if (session.eventCount > 0) {
-    return `${session.eventCount} 段线索`;
-  }
-
-  if (session.status === "completed" || session.status === "stopped") {
-    return "比较安静";
-  }
-
-  return "已记录";
-}
-
-function audioSummary(session: SleepAudioSession | null): string {
-  if (!session) {
-    return "昨晚未开启声音监听。这完全没关系，不影响这次打卡和成长记录。";
-  }
-
-  if (session.status === "permission_denied") {
-    return "昨晚没有麦克风授权，所以没有记录声音摘要。睡前闭环仍然已经完成。";
-  }
-
-  if (session.eventCount > 0) {
-    return "昨晚检测到几段明显声音。它可能来自梦话、翻身或环境声，先把它当作一个温柔线索就好。";
-  }
-
-  return session.localAudioUri
-    ? "昨晚已经在本机留下录音。当前只展示安静摘要，不上传原始音频，也不做医学判断。"
-    : "昨晚没有记录到明显声音线索。";
 }
 
 const styles = StyleSheet.create({

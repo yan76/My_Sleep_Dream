@@ -1,5 +1,10 @@
 import { DailyExecutionRecord, RescueSession, UserConfig } from "@/types/app";
-import { dailyCycleAtLeast } from "@/utils/dailyCycle";
+import {
+  dailyCycleHasClosedExternal,
+  dailyCycleHasCompletedReview,
+  dailyCycleHasStartedSleepAidAfterReview,
+  dailyCycleIsReadyToSleepAfterReview
+} from "@/utils/dailyCycle";
 import { getReasonBasedRescueHint } from "@/utils/sleepPreferences";
 
 export type RescueData = {
@@ -37,17 +42,37 @@ function isInactiveSession(session: RescueSession | null): boolean {
   return Boolean(session && ["completed", "abandoned"].includes(session.status));
 }
 
+function sessionHasCompletedReview(session: RescueSession | null): boolean {
+  return Boolean(session?.todayReviewCompleted || session?.todayReviewCompletedAt);
+}
+
+function sessionHasStartedSleepAidAfterReview(session: RescueSession | null): boolean {
+  return Boolean(sessionHasCompletedReview(session) && session?.status === "in_relax_mode");
+}
+
+function sessionIsReadyToSleepAfterReview(session: RescueSession | null): boolean {
+  if (!sessionHasCompletedReview(session)) {
+    return false;
+  }
+
+  if (session?.readyToSleepAt) {
+    return session.todayReviewCompletedAt ? session.readyToSleepAt >= session.todayReviewCompletedAt : true;
+  }
+
+  return session?.status === "ready_to_sleep";
+}
+
 function getStepState(
   id: FlowStepId,
   session: RescueSession | null,
   executionRecord: DailyExecutionRecord | null
 ): StepState {
-  const externalDone = dailyCycleAtLeast(executionRecord, "external_closed") || (session?.ritualStep ?? 0) >= 1;
-  const reviewDone = dailyCycleAtLeast(executionRecord, "review_completed") || Boolean(session?.todayReviewCompleted);
+  const externalDone = dailyCycleHasClosedExternal(executionRecord) || (session?.ritualStep ?? 0) >= 1;
+  const reviewDone = dailyCycleHasCompletedReview(executionRecord) || sessionHasCompletedReview(session);
   const sleepAidStarted =
-    dailyCycleAtLeast(executionRecord, "sleep_aid_started") ||
-    Boolean(session?.sleepGeneratorUsed || session?.relaxModeUsed || session?.treeHoleUsed);
-  const readyToSleep = dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep";
+    dailyCycleHasStartedSleepAidAfterReview(executionRecord) ||
+    sessionHasStartedSleepAidAfterReview(session);
+  const readyToSleep = dailyCycleIsReadyToSleepAfterReview(executionRecord) || sessionIsReadyToSleepAfterReview(session);
 
   if (id === "external") {
     return externalDone || reviewDone || sleepAidStarted || readyToSleep ? "done" : "active";
@@ -102,7 +127,7 @@ export function buildRescueViewModel(
     }
   ];
 
-  if (dailyCycleAtLeast(executionRecord, "ready_to_sleep") || session?.status === "ready_to_sleep") {
+  if (dailyCycleIsReadyToSleepAfterReview(executionRecord) || sessionIsReadyToSleepAfterReview(session)) {
     return {
       title: "今晚已经可以停在这里",
       subtitle: "今天已经收好了，接下来不用继续证明什么。",
@@ -116,10 +141,8 @@ export function buildRescueViewModel(
   }
 
   if (
-    dailyCycleAtLeast(executionRecord, "sleep_aid_started") ||
-    session?.sleepGeneratorUsed ||
-    session?.relaxModeUsed ||
-    session?.treeHoleUsed
+    dailyCycleHasStartedSleepAidAfterReview(executionRecord) ||
+    sessionHasStartedSleepAidAfterReview(session)
   ) {
     return {
       title: "继续把睡意带近一点",
@@ -133,7 +156,7 @@ export function buildRescueViewModel(
     };
   }
 
-  if (dailyCycleAtLeast(executionRecord, "review_completed") || session?.todayReviewCompleted) {
+  if (dailyCycleHasCompletedReview(executionRecord) || sessionHasCompletedReview(session)) {
     return {
       title: "今天已经被放下了一点",
       subtitle: "做完的、没做完的，都先放在这里。现在换一种方式进入睡意。",
@@ -147,7 +170,7 @@ export function buildRescueViewModel(
   }
 
   if (
-    dailyCycleAtLeast(executionRecord, "external_closed") ||
+    dailyCycleHasClosedExternal(executionRecord) ||
     (session?.ritualStep ?? 0) >= 1 ||
     session?.status === "in_rescue_flow"
   ) {

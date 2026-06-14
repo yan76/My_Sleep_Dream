@@ -27,6 +27,50 @@ export function dailyCycleAtLeast(
   return Boolean(record && dailyCycleStatusRank[record.status] >= dailyCycleStatusRank[status]);
 }
 
+function isSameTimeOrAfter(value: string | undefined, baseline: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  return baseline ? value >= baseline : true;
+}
+
+export function dailyCycleHasStartedRitual(record: DailyExecutionRecord | null | undefined): boolean {
+  return Boolean(record?.ritualStartedAt || record?.status === "ritual_started");
+}
+
+export function dailyCycleHasClosedExternal(record: DailyExecutionRecord | null | undefined): boolean {
+  return Boolean(record?.externalClosedAt || record?.status === "external_closed");
+}
+
+export function dailyCycleHasCompletedReview(record: DailyExecutionRecord | null | undefined): boolean {
+  return Boolean(record?.reviewCompletedAt || record?.status === "review_completed");
+}
+
+export function dailyCycleHasStartedSleepAidAfterReview(record: DailyExecutionRecord | null | undefined): boolean {
+  if (!record || !dailyCycleHasCompletedReview(record)) {
+    return false;
+  }
+
+  if (record.sleepAidStartedAt) {
+    return isSameTimeOrAfter(record.sleepAidStartedAt, record.reviewCompletedAt);
+  }
+
+  return record.status === "sleep_aid_started";
+}
+
+export function dailyCycleIsReadyToSleepAfterReview(record: DailyExecutionRecord | null | undefined): boolean {
+  if (!record || !dailyCycleHasCompletedReview(record)) {
+    return false;
+  }
+
+  if (record.readyToSleepAt) {
+    return isSameTimeOrAfter(record.readyToSleepAt, record.reviewCompletedAt);
+  }
+
+  return record.status === "ready_to_sleep" || record.status === "needs_checkin";
+}
+
 export function classifySleepResult(actualSleepTime: string, plannedSleepTime: string): SleepResult {
   const actual = timeToMinutes(actualSleepTime);
   const planned = timeToMinutes(plannedSleepTime);

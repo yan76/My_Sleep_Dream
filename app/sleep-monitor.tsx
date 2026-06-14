@@ -1,13 +1,15 @@
-import { router } from "expo-router";
 import {
+  createAudioPlayer,
   RecordingPresets,
   setAudioModeAsync,
   setIsAudioActiveAsync,
   useAudioRecorder,
   useAudioRecorderState
 } from "expo-audio";
-import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { AudioPlayer } from "expo-audio";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
 import { Screen } from "@/components/common/Screen";
@@ -17,33 +19,114 @@ import { resolveCurrentCycleDate } from "@/storage/demoCycleDateStorage";
 import {
   createSleepAudioSession,
   deleteSleepAudioSession,
-  getSleepAudioSessionByDate,
   markSleepAudioPermissionDenied,
   updateSleepAudioSessionStatus
 } from "@/storage/sleepAudioStorage";
+import { deleteSleepAudioRecording, requestSleepAudioPermission } from "@/services/sleepAudioRecorder";
+import { isNativeSleepAudioMonitoringAvailable } from "@/services/sleepAudioMonitoringNative";
 import {
-  deleteSleepAudioRecording,
-  requestSleepAudioPermission
-} from "@/services/sleepAudioRecorder";
+  deleteSleepMonitoringSession,
+  getSleepMonitoringStatus,
+  startSleepMonitoring,
+  stopSleepMonitoring
+} from "@/services/sleepAudioMonitoringService";
 import { SleepAudioSession } from "@/types/app";
 
+type PreviewClip = {
+  id: string;
+  uri: string;
+  durationMs?: number;
+};
+
+const maxStoredWebRecordingBytes = 3 * 1024 * 1024;
+
 export default function SleepMonitorScreen() {
-  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
-  const recorderState = useAudioRecorderState(recorder);
+  const fallbackRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const fallbackRecorderState = useAudioRecorderState(fallbackRecorder);
   const [date, setDate] = useState<string | null>(null);
   const [session, setSession] = useState<SleepAudioSession | null>(null);
   const [busy, setBusy] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewClipIndex, setPreviewClipIndex] = useState<number | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const playerSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
+  const fallbackRecordingRef = useRef(false);
+  const previewRunRef = useRef(0);
+
+  const cleanupPlayer = useCallback(() => {
+    playerSubscriptionRef.current?.remove();
+    playerSubscriptionRef.current = null;
+
+    webAudioRef.current?.pause();
+    if (webAudioRef.current) {
+      webAudioRef.current.currentTime = 0;
+      webAudioRef.current.removeAttribute("src");
+      webAudioRef.current.load();
+    }
+    webAudioRef.current = null;
+
+    const player = playerRef.current;
+    playerRef.current = null;
+    if (!player) {
+      return;
+    }
+
+    try {
+      player.pause();
+    } catch {
+      // The player may already have been released by a native completion event.
+    }
+
+    try {
+      player.remove();
+    } catch {
+      // The player may already have been released by a native completion event.
+    }
+  }, []);
+
+  const stopPreview = useCallback(() => {
+    previewRunRef.current += 1;
+    cleanupPlayer();
+    setPreviewing(false);
+    setPreviewClipIndex(null);
+  }, [cleanupPlayer]);
 
   const loadSession = useCallback(async () => {
     const cycleDate = await resolveCurrentCycleDate();
+    const status = await getSleepMonitoringStatus(cycleDate);
     setDate(cycleDate);
-    setSession(await getSleepAudioSessionByDate(cycleDate));
+    setSession(status.session);
+    setRecordingError(status.lastError ?? null);
+    setPreviewError(null);
   }, []);
 
   useEffect(() => {
     loadSession();
   }, [loadSession]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopPreview();
+      };
+    }, [stopPreview])
+  );
+
+  const playableClips = useMemo(() => createPlayableClips(session), [session]);
+  const nativeMonitoringAvailable = isNativeSleepAudioMonitoringAvailable();
+
+  const preparePreviewAudioSession = useCallback(async () => {
+    await setIsAudioActiveAsync(true);
+    await setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false
+    });
+  }, []);
 
   const start = async () => {
     if (busy) {
@@ -51,37 +134,49 @@ export default function SleepMonitorScreen() {
     }
 
     const cycleDate = date ?? (await resolveCurrentCycleDate());
+    stopPreview();
     setBusy(true);
     try {
       setRecordingError(null);
-      const permission = await requestSleepAudioPermission();
-      if (permission !== "granted") {
-        setSession(await markSleepAudioPermissionDenied(cycleDate));
+      setPreviewError(null);
+      if (!nativeMonitoringAvailable) {
+        const permission = await requestSleepAudioPermission();
+        if (permission !== "granted") {
+          setSession(await markSleepAudioPermissionDenied(cycleDate));
+          return;
+        }
+
+        await setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: false,
+          shouldPlayInBackground: false,
+          shouldRouteThroughEarpiece: false
+        });
+        await fallbackRecorder.prepareToRecordAsync();
+        fallbackRecorder.record();
+        fallbackRecordingRef.current = true;
+        const next = await createSleepAudioSession(cycleDate, {
+          localAudioUri: fallbackRecorder.uri ?? fallbackRecorderState.url ?? undefined
+        });
+        await markSleepAudioEnabled(next.id, cycleDate);
+        setSession(next);
         return;
       }
 
-      await setAudioModeAsync({
-        allowsRecording: true,
-        playsInSilentMode: false,
-        shouldPlayInBackground: false,
-        shouldRouteThroughEarpiece: false
-      });
-      await recorder.prepareToRecordAsync();
-      recorder.record();
-      const next = await createSleepAudioSession(cycleDate, {
-        localAudioUri: recorder.uri ?? recorderState.url ?? undefined
-      });
-      await markSleepAudioEnabled(next.id, cycleDate);
-      setSession(next);
+      const status = await startSleepMonitoring(cycleDate);
+      setSession(status.session);
+      setRecordingError(status.lastError ?? null);
     } catch (error) {
       console.warn("[sleep-audio] Failed to start recorder", error);
       await setIsAudioActiveAsync(false).catch(() => undefined);
       setRecordingError("录音启动失败，请确认没有其他应用占用麦克风后再试。");
-      const failed = await updateSleepAudioSessionStatus(cycleDate, "failed", {
-        localAudioUri: recorder.uri ?? recorderState.url ?? undefined
-      }).catch(() => null);
-      if (failed) {
-        setSession(failed);
+      if (!nativeMonitoringAvailable) {
+        const failed = await updateSleepAudioSessionStatus(cycleDate, "failed", {
+          localAudioUri: fallbackRecorder.uri ?? fallbackRecorderState.url ?? undefined
+        }).catch(() => null);
+        if (failed) {
+          setSession(failed);
+        }
       }
     } finally {
       setBusy(false);
@@ -94,36 +189,52 @@ export default function SleepMonitorScreen() {
     }
 
     const cycleDate = date ?? (await resolveCurrentCycleDate());
+    stopPreview();
     setBusy(true);
     try {
       setRecordingError(null);
-      if (!recorderState.isRecording) {
+      setPreviewError(null);
+      if (!nativeMonitoringAvailable) {
+        const statusBeforeStop = fallbackRecorder.getStatus();
+        const shouldStopFallbackRecorder = fallbackRecordingRef.current || Boolean(statusBeforeStop.isRecording);
+        if (!shouldStopFallbackRecorder) {
+          await setIsAudioActiveAsync(false).catch(() => undefined);
+          setSession(await updateSleepAudioSessionStatus(cycleDate, "completed", {
+            localAudioUri: session?.localAudioUri
+          }));
+          return;
+        }
+
+        const startedDuration = Math.max(fallbackRecorderState.durationMillis ?? 0, statusBeforeStop.durationMillis ?? 0);
+        await fallbackRecorder.stop();
+        fallbackRecordingRef.current = false;
+        const status = fallbackRecorder.getStatus();
+        const localAudioUri = await normalizeFallbackRecordingUri(fallbackRecorder.uri ?? status.url ?? session?.localAudioUri);
         await setIsAudioActiveAsync(false).catch(() => undefined);
         setSession(await updateSleepAudioSessionStatus(cycleDate, "completed", {
-          localAudioUri: session?.localAudioUri
+          localAudioUri,
+          summary: startedDuration || status.durationMillis
+            ? { quietScore: 92, hasVoiceLikeSound: false, hasSnoreLikeSound: false }
+            : undefined
         }));
         return;
       }
 
-      const startedDuration = recorderState.durationMillis;
-      await recorder.stop();
-      const status = recorder.getStatus();
-      await setIsAudioActiveAsync(false).catch(() => undefined);
-      setSession(await updateSleepAudioSessionStatus(cycleDate, "completed", {
-        localAudioUri: recorder.uri ?? status.url ?? session?.localAudioUri,
-        summary: startedDuration || status.durationMillis
-          ? { quietScore: 92, hasVoiceLikeSound: false, hasSnoreLikeSound: false }
-          : undefined
-      }));
+      const status = await stopSleepMonitoring(cycleDate);
+      setSession(status.session);
+      setRecordingError(status.lastError ?? null);
     } catch (error) {
       console.warn("[sleep-audio] Failed to stop recorder", error);
       await setIsAudioActiveAsync(false).catch(() => undefined);
       setRecordingError("停止录音失败，你可以删除今晚监听记录后重新开始。");
-      const failed = await updateSleepAudioSessionStatus(cycleDate, "failed", {
-        localAudioUri: recorder.uri ?? recorderState.url ?? session?.localAudioUri
-      }).catch(() => null);
-      if (failed) {
-        setSession(failed);
+      if (!nativeMonitoringAvailable) {
+        fallbackRecordingRef.current = false;
+        const failed = await updateSleepAudioSessionStatus(cycleDate, "failed", {
+          localAudioUri: fallbackRecorder.uri ?? fallbackRecorderState.url ?? session?.localAudioUri
+        }).catch(() => null);
+        if (failed) {
+          setSession(failed);
+        }
       }
     } finally {
       setBusy(false);
@@ -136,16 +247,26 @@ export default function SleepMonitorScreen() {
     }
 
     const cycleDate = date ?? (await resolveCurrentCycleDate());
+    stopPreview();
     setBusy(true);
     try {
       setRecordingError(null);
-      if (recorderState.isRecording) {
-        await recorder.stop().catch(() => undefined);
-        await setIsAudioActiveAsync(false).catch(() => undefined);
+      setPreviewError(null);
+      if (!nativeMonitoringAvailable) {
+        const statusBeforeDelete = fallbackRecorder.getStatus();
+        if (fallbackRecordingRef.current || statusBeforeDelete.isRecording) {
+          await fallbackRecorder.stop().catch(() => undefined);
+          fallbackRecordingRef.current = false;
+          await setIsAudioActiveAsync(false).catch(() => undefined);
+        }
+        await deleteSleepAudioRecording(session?.localAudioUri);
+        await deleteSleepAudioSession(cycleDate);
+        await markSleepAudioDeleted(cycleDate);
+        setSession(null);
+        return;
       }
-      await deleteSleepAudioRecording(session?.localAudioUri);
-      await deleteSleepAudioSession(cycleDate);
-      await markSleepAudioDeleted(cycleDate);
+
+      await deleteSleepMonitoringSession(cycleDate);
       setSession(null);
     } catch (error) {
       console.warn("[sleep-audio] Failed to delete recording", error);
@@ -155,10 +276,107 @@ export default function SleepMonitorScreen() {
     }
   };
 
-  const isRecording = session?.status === "recording" || recorderState.isRecording;
+  const isRecording = session?.status === "recording" || (!nativeMonitoringAvailable && fallbackRecorderState.isRecording);
   const hasFinished = session?.status === "completed" || session?.status === "stopped";
   const denied = session?.status === "permission_denied";
   const failed = session?.status === "failed";
+  const hasLocalClips = playableClips.length > 0;
+  const canPreview = hasFinished && hasLocalClips && !isRecording;
+  const hasFinishedWithoutPreview = hasFinished && !hasLocalClips && !denied && !failed;
+  const eventCountLabel = `${session?.eventCount ?? 0} 段`;
+
+  const playClipAt = useCallback(
+    async (index: number, runId: number) => {
+      if (runId !== previewRunRef.current) {
+        return;
+      }
+
+      if (index >= playableClips.length) {
+        cleanupPlayer();
+        setPreviewing(false);
+        setPreviewClipIndex(null);
+        return;
+      }
+
+      const clip = playableClips[index];
+      cleanupPlayer();
+
+      try {
+        if (Platform.OS === "web") {
+          const audio = new Audio(clip.uri);
+          audio.muted = false;
+          audio.volume = 1;
+          audio.onended = () => {
+            if (runId === previewRunRef.current) {
+              void playClipAt(index + 1, runId);
+            }
+          };
+          audio.onerror = () => {
+            if (runId !== previewRunRef.current) {
+              return;
+            }
+
+            cleanupPlayer();
+            setPreviewing(false);
+            setPreviewClipIndex(null);
+            setPreviewError("音频预览失败，文件可能已被清理或监听记录已删除。");
+          };
+          webAudioRef.current = audio;
+          setPreviewClipIndex(index);
+          await audio.play();
+          return;
+        }
+
+        await preparePreviewAudioSession();
+        const player = createAudioPlayer({ uri: normalizePreviewUri(clip.uri) }, 250);
+        player.loop = false;
+        player.volume = 1;
+        playerRef.current = player;
+        setPreviewClipIndex(index);
+        playerSubscriptionRef.current = player.addListener("playbackStatusUpdate", (status) => {
+          if (runId !== previewRunRef.current) {
+            return;
+          }
+
+          if (status.didJustFinish) {
+            void playClipAt(index + 1, runId);
+          }
+        });
+        player.play();
+      } catch (error) {
+        console.warn("[sleep-audio] Failed to preview recording", error);
+        cleanupPlayer();
+        setPreviewing(false);
+        setPreviewClipIndex(null);
+        setPreviewError("音频预览失败，文件可能已被清理或监听记录已删除。");
+      }
+    },
+    [cleanupPlayer, playableClips, preparePreviewAudioSession]
+  );
+
+  const togglePreview = () => {
+    if (previewing) {
+      stopPreview();
+      setPreviewError(null);
+      return;
+    }
+
+    if (!canPreview) {
+      return;
+    }
+
+    const runId = previewRunRef.current + 1;
+    previewRunRef.current = runId;
+    setPreviewError(null);
+    setPreviewing(true);
+    void playClipAt(0, runId);
+  };
+
+  useEffect(() => {
+    if (previewing && !canPreview) {
+      stopPreview();
+    }
+  }, [canPreview, previewing, stopPreview]);
 
   return (
     <Screen>
@@ -190,18 +408,29 @@ export default function SleepMonitorScreen() {
             : failed
               ? "今晚监听没有成功启动。你可以删除这条记录后重新开始。"
             : isRecording
-              ? "正在本机录音。第一版只保存原始本机音频和安静摘要，不做医学判断。"
+              ? "正在本机监听。第一版只保存声音事件短片段和摘要，不做医学判断。"
               : hasFinished
-                ? "明早打卡时，会看到昨晚的声音线索摘要。原始音频仍只留在本机。"
+                ? "明早打卡时，会看到昨晚的声音线索摘要。声音片段仍只留在本机。"
                 : "点击开始后，App 会请求麦克风权限并在本机创建一段睡眠监听录音。"}
         </Text>
-        {session?.localAudioUri ? <Text style={styles.uriText}>本机文件已保存</Text> : null}
+        {canPreview ? (
+          <Text style={styles.uriText}>
+            {previewing && previewClipIndex != null
+              ? `正在预览第 ${previewClipIndex + 1}/${playableClips.length} 段`
+              : `可预览 ${playableClips.length} 段本机音频`}
+          </Text>
+        ) : hasLocalClips ? (
+          <Text style={styles.uriText}>本机短片段已保存</Text>
+        ) : hasFinishedWithoutPreview ? (
+          <Text style={styles.uriText}>这条监听记录没有可预览音频。重新开始监听后，生成音频时会出现预览按钮。</Text>
+        ) : null}
+        {previewError ? <Text style={styles.errorText}>{previewError}</Text> : null}
       </AppCard>
 
       <View style={styles.factGrid}>
         <View style={styles.fact}>
-          <Text style={styles.label}>数据边界</Text>
-          <Text style={styles.factValue}>本机摘要</Text>
+          <Text style={styles.label}>声音线索</Text>
+          <Text style={styles.factValue}>{eventCountLabel}</Text>
         </View>
         <View style={styles.fact}>
           <Text style={styles.label}>云端上传</Text>
@@ -214,6 +443,16 @@ export default function SleepMonitorScreen() {
       ) : (
         <AppButton title={busy ? "正在准备..." : "开始监听"} variant="gradient" onPress={start} disabled={busy} />
       )}
+      {canPreview ? (
+        <AppButton
+          title={previewing ? "停止预览" : "预览当天录音"}
+          variant="secondary"
+          onPress={togglePreview}
+          disabled={busy}
+        />
+      ) : hasFinishedWithoutPreview ? (
+        <AppButton title="暂无可预览音频" variant="ghost" onPress={() => undefined} disabled />
+      ) : null}
       {hasFinished || denied || failed ? (
         <AppButton title={busy ? "正在删除..." : "删除今晚监听记录"} variant="danger" onPress={remove} disabled={busy} />
       ) : null}
@@ -243,6 +482,80 @@ function statusLabel(session: SleepAudioSession | null): string {
   }
 
   return "待处理";
+}
+
+function createPlayableClips(session: SleepAudioSession | null): PreviewClip[] {
+  if (!session) {
+    return [];
+  }
+
+  const eventClips = session.events
+    .filter((event) => Boolean(event.localClipUri))
+    .sort((left, right) => left.startedAt.localeCompare(right.startedAt))
+    .map((event) => ({
+      id: event.id,
+      uri: event.localClipUri!,
+      durationMs: event.durationMs
+    }));
+
+  if (eventClips.length > 0) {
+    return eventClips;
+  }
+
+  return session.localAudioUri
+    ? [
+        {
+          id: `${session.id}:local-audio`,
+          uri: session.localAudioUri
+        }
+      ]
+    : [];
+}
+
+function normalizePreviewUri(uri: string): string {
+  if (Platform.OS === "android" && uri.startsWith("file://")) {
+    return uri.replace("file://", "");
+  }
+
+  return uri;
+}
+
+async function normalizeFallbackRecordingUri(uri?: string | null): Promise<string | undefined> {
+  if (!uri) {
+    return undefined;
+  }
+
+  if (Platform.OS !== "web" || !uri.startsWith("blob:")) {
+    return uri;
+  }
+
+  try {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    if (blob.size > maxStoredWebRecordingBytes) {
+      return uri;
+    }
+
+    return await blobToDataUri(blob);
+  } catch {
+    return uri;
+  }
+}
+
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("录音数据读取失败。"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("录音数据读取失败。"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 const styles = StyleSheet.create({
@@ -323,6 +636,12 @@ const styles = StyleSheet.create({
   },
   uriText: {
     color: colors.accent,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800"
+  },
+  errorText: {
+    color: colors.danger,
     fontSize: 13,
     lineHeight: 19,
     fontWeight: "800"

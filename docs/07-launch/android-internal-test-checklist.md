@@ -1,6 +1,6 @@
 # 第 15 周：Android 内测发布检查清单
 
-更新时间：2026-06-05
+更新时间：2026-06-10
 
 ## 构建配置
 
@@ -15,13 +15,15 @@
 - `production.android.buildType` 为 `app-bundle`，用于 Google Play。
 - `app.json` 已配置 Android package：`com.mysleepdream.app`。
 - `app.json` 已配置 versionCode：`1`。
-- `app.json` Android 权限只包含 `RECORD_AUDIO` 和 `POST_NOTIFICATIONS`。
+- `app.json` Android 权限包含 `RECORD_AUDIO`、`POST_NOTIFICATIONS`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_MICROPHONE`。
 
 ## 内测设备回归
 
 - 首次安装：onboarding、目标时间、晚睡原因、助眠偏好可保存。
 - 睡前提醒：开启、关闭、修改时间、修改提前量后不会重复注册。
-- 睡眠监听：授权、拒绝、开始、停止、删除本机音频都不崩溃。
+- 睡眠监听：授权、拒绝、开始、锁屏 10 分钟、停止、删除本机声音片段都不崩溃。
+- 睡眠监听结果：次日打卡能展示声音摘要、时间线、疑似分类和片段回放。
+- 睡眠监听异常：来电、切后台、低电量、麦克风占用后不会红屏，失败状态可读。
 - 主闭环：首页进入自救、复盘、下线挑战、助眠、准备睡觉、次日打卡、反馈查看。
 - AI：树洞、睡意生成、周总结在云端不可用时有本地兜底。
 - 同步：断网写入不丢；恢复网络后 pending queue 可继续处理。
@@ -35,11 +37,13 @@
 - `notification`：不准时、重复提醒、权限拒绝。
 - `ai_limit`：超额、失败兜底、安全边界。
 - `permission`：麦克风、通知、删除音频。
+- `sleep_audio`：锁屏监听中断、事件误报、片段播放失败、文件清理失败。
 - `ui_copy`：文案、空状态、可读性。
 
 ## 发布门禁
 
 - 至少一台 Android 真机连续 3 天完成核心闭环。
+- 至少一台 Android 真机完成睡眠监听锁屏运行、次日查看、片段回放和删除。
 - 没有未解释的崩溃或红屏。
 - 生产 AAB 构建成功。
 - Google Play 权限声明与 App 内 `/legal` 页面一致。

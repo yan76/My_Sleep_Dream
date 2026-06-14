@@ -11,7 +11,7 @@ export type PermissionDisclosure = {
   boundary: string;
 };
 
-export const complianceLastUpdated = "2026-06-05";
+export const complianceLastUpdated = "2026-06-10";
 
 export const complianceSections: ComplianceSection[] = [
   {
@@ -19,7 +19,7 @@ export const complianceSections: ComplianceSection[] = [
     title: "隐私政策摘要",
     body: "早睡自救局优先在本机保存你的睡前计划、复盘、打卡、提醒和睡眠监听记录。云端同步和 AI 能力只有在服务已配置时才会使用，并且必须保留本地兜底。",
     bullets: [
-      "原始睡眠监听音频默认只保存在本机，不上传云端。",
+      "睡眠监听默认只保存本机声音事件短片段和摘要，不上传原始音频。",
       "云端只同步每日闭环、复盘、打卡、AI 记录和睡眠监听摘要元数据。",
       "你可以在设置页清空本机数据，也可以发起云端账号数据删除。"
     ]
@@ -47,9 +47,9 @@ export const complianceSections: ComplianceSection[] = [
   {
     id: "sleep-audio",
     title: "睡眠监听说明",
-    body: "睡眠监听必须由你主动开启麦克风权限。第一版只做本机录音和安静摘要，不做医学判断。",
+    body: "睡眠监听必须由你主动开启麦克风权限。Android 版本会通过前台通知提示监听正在运行，只保存本机声音线索，不做医学判断。",
     bullets: [
-      "你可以随时停止监听，并删除今晚的本机音频文件。",
+      "你可以随时停止监听，并删除今晚的本机声音片段和摘要。",
       "拒绝麦克风权限不会影响其他睡前流程。",
       "睡眠监听结果只作为次日自我回顾线索，不用于判断疾病。"
     ]
@@ -64,8 +64,13 @@ export const permissionDisclosures: PermissionDisclosure[] = [
   },
   {
     title: "麦克风权限",
-    usage: "仅在你主动点击开始监听后，用于本机睡眠监听录音。",
-    boundary: "原始音频默认不上云，可在睡眠监听页删除。"
+    usage: "仅在你主动点击开始监听后，用于本机睡眠监听和声音事件短片段生成。",
+    boundary: "原始音频默认不上云，可在睡眠监听页或次日声音线索卡删除。"
+  },
+  {
+    title: "前台服务",
+    usage: "Android 锁屏监听时用于保持睡眠监听运行，并显示系统通知。",
+    boundary: "只有你主动开始监听后才运行，停止或删除监听后会结束。"
   },
   {
     title: "文件存储",
@@ -79,5 +84,5 @@ export const storeListingCopy = {
   shortDescription: "一个帮你在夜里及时收尾、放下手机、回到睡眠节奏的自救工具。",
   fullDescription:
     "早睡自救局把睡前提醒、晚间复盘、下线挑战、声音 Spa、AI 树洞、睡意生成、次日打卡和成长记录放进一个温和闭环。它适合想减少报复性熬夜、刷屏停不下来、睡前脑子过载的人。产品不提供医疗诊断或治疗建议，睡眠监听音频默认只保存在本机。",
-  permissionSummary: "通知用于睡前提醒；麦克风仅用于主动开启的本机睡眠监听；原始音频默认不上云。"
+  permissionSummary: "通知用于睡前提醒；麦克风和 Android 前台服务仅用于主动开启的本机睡眠监听；原始音频默认不上云。"
 };

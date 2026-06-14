@@ -1,0 +1,37 @@
+[
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-advice-background\\source\\advice-background-source.png",
+    "width": 475,
+    "height": 266,
+    "mode": "RGB",
+    "has_alpha_channel": false
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-advice-background\\source\\advice-background-source-750.png",
+    "width": 750,
+    "height": 420,
+    "mode": "RGBA",
+    "has_alpha_channel": true
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-advice-background\\assets\\images\\image-advice-card-reference-01.png",
+    "width": 692,
+    "height": 349,
+    "mode": "RGBA",
+    "has_alpha_channel": true
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-advice-background\\assets\\images\\image-advice-card-background-clean.png",
+    "width": 685,
+    "height": 345,
+    "mode": "RGBA",
+    "has_alpha_channel": true
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\ui\\growth-advice-card-background.png",
+    "width": 685,
+    "height": 345,
+    "mode": "RGBA",
+    "has_alpha_channel": true
+  }
+]

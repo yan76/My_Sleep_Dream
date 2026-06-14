@@ -5,17 +5,14 @@ import { AppButton } from "@/components/common/AppButton";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { SleepAidOption } from "@/constants/sleepAidPreferences";
+import { completeReadyToSleepAfterRescue } from "@/features/rescue/readyToSleepUseCase";
 import {
   getTodayReview,
   getUserConfig,
-  markReadyToSleep,
   markSleepGeneratorUsed,
   markTreeHoleUsed
 } from "@/storage/rescueSessionStorage";
-import {
-  markReadyToSleep as markExecutionReadyToSleep,
-  markSleepAidStarted
-} from "@/storage/dailyExecutionStorage";
+import { markSleepAidStarted } from "@/storage/dailyExecutionStorage";
 import { generateSleepScript, SleepScriptResult } from "@/services/sleepScriptService";
 import { TodayReview, UserConfig } from "@/types/app";
 import { getRecommendedSleepAids } from "@/utils/sleepPreferences";
@@ -131,8 +128,11 @@ export default function SleepGeneratorScreen() {
     try {
       await markSleepGeneratorUsed(primaryAid?.label ?? "睡意生成器");
       await markSleepAidStarted({ aid: primaryAid?.id ?? "sleep_generator" });
-      await markReadyToSleep();
-      await markExecutionReadyToSleep();
+      const completed = await completeReadyToSleepAfterRescue();
+      if (!completed) {
+        router.replace("/rescue");
+        return;
+      }
       router.replace("/rescue");
     } finally {
       setIsChoosing(false);

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>成长页 UI 资产预览</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #080a15;
+        --panel: #101322;
+        --line: rgba(255, 255, 255, 0.14);
+        --ink: #f4f5ff;
+        --muted: #a9aec4;
+        --gold: #efd7a2;
+        --font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 80% 5%, rgba(92, 98, 166, 0.18), transparent 32%),
+          linear-gradient(180deg, #070815 0%, #090b18 100%);
+        color: var(--ink);
+        font-family: var(--font);
+      }
+
+      main {
+        width: min(100%, 1180px);
+        margin: 0 auto;
+        padding: 32px 24px 56px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 38px;
+      }
+
+      h2 {
+        font-size: 20px;
+        line-height: 28px;
+      }
+
+      p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 22px;
+      }
+
+      .section {
+        margin-top: 28px;
+      }
+
+      .screen-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 22px;
+        align-items: start;
+      }
+
+      .screen {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        overflow: hidden;
+      }
+
+      .screen header,
+      .asset-card header {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .screen img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .source-frame {
+        max-height: 760px;
+        overflow: auto;
+        background: #050611;
+      }
+
+      .asset-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 16px;
+      }
+
+      .asset-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.04);
+        overflow: hidden;
+      }
+
+      .checker {
+        min-height: 150px;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        background-color: #f7f7f7;
+        background-image:
+          linear-gradient(45deg, #e4e4e4 25%, transparent 25%),
+          linear-gradient(-45deg, #e4e4e4 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #e4e4e4 75%),
+          linear-gradient(-45deg, transparent 75%, #e4e4e4 75%);
+        background-position:
+          0 0,
+          0 8px,
+          8px -8px,
+          -8px 0;
+        background-size: 16px 16px;
+      }
+
+      .checker img {
+        max-width: 130px;
+        max-height: 112px;
+        object-fit: contain;
+      }
+
+      .image-crop img {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+        display: block;
+      }
+
+      code {
+        color: var(--gold);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>成长页 UI 资产预览</h1>
+      <p>源图按统一比例归一化到 750px 宽；切图资源来自本次两张截图，manifest 位于 <code>assets/generated/yueban-growth-ui/layers.manifest.json</code>。</p>
+
+      <section class="section">
+        <h2>750px 视口源图</h2>
+        <div class="screen-grid">
+          <article class="screen">
+            <header>
+              <strong>上屏</strong>
+              <p><code>source/growth-week-top-source-750.png</code></p>
+            </header>
+            <div class="source-frame">
+              <img src="../../assets/generated/yueban-growth-ui/source/growth-week-top-source-750.png" alt="成长页上屏 750px 源图" />
+            </div>
+          </article>
+          <article class="screen">
+            <header>
+              <strong>下屏</strong>
+              <p><code>source/growth-week-bottom-source-750.png</code></p>
+            </header>
+            <div class="source-frame">
+              <img src="../../assets/generated/yueban-growth-ui/source/growth-week-bottom-source-750.png" alt="成长页下屏 750px 源图" />
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>拼接 QA 参考</h2>
+        <article class="screen">
+          <header>
+            <strong>滚动页参考</strong>
+            <p><code>source/growth-week-stitch-source-750.png</code></p>
+          </header>
+          <div class="source-frame">
+            <img src="../../assets/generated/yueban-growth-ui/source/growth-week-stitch-source-750.png" alt="成长页滚动拼接参考" />
+          </div>
+        </article>
+      </section>
+
+      <section class="section">
+        <h2>透明 PNG</h2>
+        <div class="asset-grid">
+          <article class="asset-card">
+            <header><code>icon-growth-journal-leaf-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/icons/icon-growth-journal-leaf-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>illustration-growth-streak-badge-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/illustrations/illustration-growth-streak-badge-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>illustration-growth-moon-badge-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/illustrations/illustration-growth-moon-badge-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>icon-growth-locked-badge-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/icons/icon-growth-locked-badge-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>icon-growth-bottom-nav-home-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/icons/icon-growth-bottom-nav-home-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>icon-growth-bottom-nav-rescue-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/icons/icon-growth-bottom-nav-rescue-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>icon-growth-bottom-nav-growth-active-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/icons/icon-growth-bottom-nav-growth-active-01.png" alt="" /></div>
+          </article>
+          <article class="asset-card">
+            <header><code>icon-growth-bottom-nav-settings-01.png</code></header>
+            <div class="checker"><img src="../../assets/generated/yueban-growth-ui/assets/icons/icon-growth-bottom-nav-settings-01.png" alt="" /></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>图片裁片</h2>
+        <div class="asset-grid">
+          <article class="asset-card image-crop">
+            <header><code>image-growth-advice-card-full-01.png</code></header>
+            <img src="../../assets/generated/yueban-growth-ui/assets/images/image-growth-advice-card-full-01.png" alt="" />
+          </article>
+          <article class="asset-card image-crop">
+            <header><code>image-growth-advice-moon-scene-01.png</code></header>
+            <img src="../../assets/generated/yueban-growth-ui/assets/images/image-growth-advice-moon-scene-01.png" alt="" />
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>QA 输出</h2>
+        <p><code>qa/bbox-preview-top-bitmap.png</code>、<code>qa/bbox-preview-bottom-bitmap.png</code>、<code>qa/transparent-assets-preview.png</code>、<code>qa/restoration-report.md</code></p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,7 +1,13 @@
 import { router } from "expo-router";
 import { isDemoMode } from "@/constants/demo";
 import { AppStats, DailyExecutionRecord, RescueSession, SleepAudioSession, SleepRecord, UserConfig } from "@/types/app";
-import { dailyCycleAtLeast } from "@/utils/dailyCycle";
+import {
+  dailyCycleHasClosedExternal,
+  dailyCycleHasCompletedReview,
+  dailyCycleHasStartedRitual,
+  dailyCycleHasStartedSleepAidAfterReview,
+  dailyCycleIsReadyToSleepAfterReview
+} from "@/utils/dailyCycle";
 import { minutesUntil, todayKey } from "@/utils/date";
 
 export type HomeRouteTarget = Parameters<typeof router.push>[0];
@@ -51,6 +57,26 @@ function isTerminalDailyCycle(record: DailyExecutionRecord | null): boolean {
 
 function isActiveSession(session: RescueSession | null): boolean {
   return Boolean(session && !["completed", "abandoned"].includes(session.status));
+}
+
+function sessionHasCompletedReview(session: RescueSession | null): boolean {
+  return Boolean(session?.todayReviewCompleted || session?.todayReviewCompletedAt);
+}
+
+function sessionHasStartedSleepAidAfterReview(session: RescueSession | null): boolean {
+  return Boolean(sessionHasCompletedReview(session) && session?.status === "in_relax_mode");
+}
+
+function sessionIsReadyToSleepAfterReview(session: RescueSession | null): boolean {
+  if (!sessionHasCompletedReview(session)) {
+    return false;
+  }
+
+  if (session?.readyToSleepAt) {
+    return session.todayReviewCompletedAt ? session.readyToSleepAt >= session.todayReviewCompletedAt : true;
+  }
+
+  return session?.status === "ready_to_sleep";
 }
 
 function isYesterday(dateKey: string): boolean {
@@ -131,17 +157,19 @@ export function buildHomeState(data: HomeData): HomeViewModel {
   const countdownMinutes = minutesUntil(userConfig.targetSleepTime);
   const reminderMinutes = userConfig.reminderMinutesBefore;
   const isInBedtimeWindow = countdownMinutes <= reminderMinutes;
-  const hasStartedCycle = Boolean(activeSession) || dailyCycleAtLeast(activeTodayExecutionRecord, "ritual_started");
-  const hasClosedExternal = dailyCycleAtLeast(activeTodayExecutionRecord, "external_closed");
+  const hasStartedCycle = Boolean(activeSession) || dailyCycleHasStartedRitual(activeTodayExecutionRecord);
+  const hasClosedExternal =
+    dailyCycleHasClosedExternal(activeTodayExecutionRecord) ||
+    (activeSession?.ritualStep ?? 0) >= 1 ||
+    activeSession?.status === "in_rescue_flow";
   const hasCompletedReview =
-    dailyCycleAtLeast(activeTodayExecutionRecord, "review_completed") || Boolean(activeSession?.todayReviewCompleted);
+    dailyCycleHasCompletedReview(activeTodayExecutionRecord) || sessionHasCompletedReview(activeSession);
   const hasStartedSleepAid =
-    dailyCycleAtLeast(activeTodayExecutionRecord, "sleep_aid_started") ||
-    Boolean(activeSession?.status === "in_relax_mode" || activeSession?.relaxModeUsed || activeSession?.sleepGeneratorUsed);
+    dailyCycleHasStartedSleepAidAfterReview(activeTodayExecutionRecord) ||
+    sessionHasStartedSleepAidAfterReview(activeSession);
   const isReadyToSleep =
-    activeTodayExecutionRecord?.status === "ready_to_sleep" ||
-    activeTodayExecutionRecord?.status === "needs_checkin" ||
-    activeSession?.status === "ready_to_sleep";
+    dailyCycleIsReadyToSleepAfterReview(activeTodayExecutionRecord) ||
+    sessionIsReadyToSleepAfterReview(activeSession);
 
   if (morningCheckInDate) {
     const audioHint = morningAudioSession?.status
