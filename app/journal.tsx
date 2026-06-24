@@ -1,7 +1,8 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { GradientLayer } from "@/components/common/GradientLayer";
 import { getTodayReviews } from "@/storage/rescueSessionStorage";
 import type { TodayReview } from "@/types/app";
 import { useResponsiveMetrics } from "@/utils/responsive";
@@ -93,7 +94,15 @@ function EmptyState() {
     <View style={styles.emptyCard}>
       <Text style={styles.emptyTitle}>还没有睡前日记</Text>
       <Text style={styles.emptyBody}>第一条不用完整，也不用漂亮。能把今天轻轻放下，就已经很好。</Text>
-      <Pressable style={[styles.gradientButton, gradientBackgroundStyle]} onPress={() => router.push("/today-review")}>
+      <Pressable style={styles.gradientButton} onPress={() => router.push("/today-review")}>
+        <GradientLayer
+          stops={[
+            { color: "#E6D5B8", location: 0 },
+            { color: "#F4ECDF", location: 0.35 },
+            { color: "#BFC4FF", location: 0.68 },
+            { color: "#8A97FF", location: 1 }
+          ]}
+        />
         <Text style={styles.gradientButtonText}>今晚写一句</Text>
       </Pressable>
     </View>
@@ -238,10 +247,6 @@ export default function JournalScreen() {
     </SafeAreaView>
   );
 }
-
-const gradientBackgroundStyle = {
-  backgroundImage: "linear-gradient(100deg, #E6D5B8 0%, #F4ECDF 35%, #BFC4FF 68%, #8A97FF 100%)"
-} as ViewStyle;
 
 const styles = StyleSheet.create({
   safeArea: {

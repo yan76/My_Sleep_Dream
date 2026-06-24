@@ -37,7 +37,9 @@
         "RECORD_AUDIO",
         "POST_NOTIFICATIONS",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MICROPHONE"
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -50,8 +52,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "ea5354c7-38ec-46b0-bf94-5f3bc16015dc"
+        "projectId": "4cdd1745-0450-43c7-8df3-90c3b5ed2113"
       }
-    }
+    },
+    "owner": "egottkxkl"
   }
 }

@@ -20,6 +20,7 @@ export type NativeSleepMonitoringStatus = {
   date?: string;
   startedAt?: string;
   stoppedAt?: string;
+  localAudioUri?: string;
   eventCount?: number;
   events?: NativeSleepMonitoringEvent[];
   summary?: NativeSleepMonitoringSummary;

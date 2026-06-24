@@ -113,6 +113,7 @@ async function persistNativeStatus(
   return updateSleepAudioSessionStatus(date, status, {
     eventCount: nativeStatus.eventCount ?? events.length,
     events,
+    localAudioUri: nativeStatus.localAudioUri,
     summary: nativeStatus.summary
   });
 }

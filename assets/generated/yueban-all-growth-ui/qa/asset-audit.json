@@ -1,0 +1,192 @@
+﻿[
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-back-01.png",
+    "width": 22,
+    "height": 28,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 22,
+    "expected_height": 28,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-first-review-01.png",
+    "width": 63,
+    "height": 63,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 63,
+    "expected_height": 63,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-hundred-night-01.png",
+    "width": 72,
+    "height": 69,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 72,
+    "expected_height": 69,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-nav-growth-active-01.png",
+    "width": 60,
+    "height": 51,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 60,
+    "expected_height": 51,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-nav-home-01.png",
+    "width": 61,
+    "height": 49,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 61,
+    "expected_height": 49,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-nav-rescue-01.png",
+    "width": 62,
+    "height": 49,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 62,
+    "expected_height": 49,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-nav-settings-01.png",
+    "width": 62,
+    "height": 49,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 62,
+    "expected_height": 49,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-save-01.png",
+    "width": 43,
+    "height": 43,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 43,
+    "expected_height": 43,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-seven-night-01.png",
+    "width": 63,
+    "height": 63,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 63,
+    "expected_height": 63,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  },
+  {
+    "path": "D:\\AI-Ego\\My_Sleep_Dream\\assets\\generated\\yueban-all-growth-ui\\assets\\icons\\icon-all-growth-test-plus-01.png",
+    "width": 27,
+    "height": 27,
+    "has_alpha_channel": true,
+    "transparent_bg_ok": true,
+    "corner_alpha_max": 0.0,
+    "corner_alpha_mean": 0.0,
+    "expected_width": 27,
+    "expected_height": 27,
+    "size_ok": true,
+    "touches_edge": false,
+    "edge_touch": {
+      "top": false,
+      "bottom": false,
+      "left": false,
+      "right": false
+    }
+  }
+]

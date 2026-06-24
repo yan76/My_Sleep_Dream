@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Pressable, StyleProp, StyleSheet, Text, ViewStyle } from "react-native";
+import { GradientLayer } from "@/components/common/GradientLayer";
 import { colors } from "@/constants/colors";
 import { useResponsiveMetrics } from "@/utils/responsive";
 
@@ -14,7 +15,7 @@ type AppButtonProps = {
 };
 
 export function AppButton({ title, onPress, variant = "primary", disabled, icon, style, size = "lg" }: AppButtonProps) {
-  const isGradientButton = variant === "primary" || variant === "gradient";
+  const isGradientButton = variant === "gradient";
   const metrics = useResponsiveMetrics();
 
   return (
@@ -26,7 +27,6 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
       style={({ pressed }) => [
         styles.base,
         styles[variant],
-        isGradientButton && gradientBackgroundStyle,
         size === "md" && styles.sizeMd,
         metrics.isCompactWidth && styles.compact,
         disabled && styles.disabled,
@@ -34,6 +34,16 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
         style
       ]}
     >
+      {isGradientButton ? (
+        <GradientLayer
+          stops={[
+            { color: colors.accent, location: 0 },
+            { color: "#F4ECDF", location: 0.36 },
+            { color: "#BFC4FF", location: 0.68 },
+            { color: colors.primary, location: 1 }
+          ]}
+        />
+      ) : null}
       {icon}
       <Text
         numberOfLines={1}
@@ -50,10 +60,6 @@ export function AppButton({ title, onPress, variant = "primary", disabled, icon,
     </Pressable>
   );
 }
-
-const gradientBackgroundStyle = {
-  backgroundImage: `linear-gradient(100deg, ${colors.accent} 0%, #F4ECDF 36%, #BFC4FF 68%, ${colors.primary} 100%)`
-} as ViewStyle;
 
 const styles = StyleSheet.create({
   base: {

@@ -1,5 +1,5 @@
 import { Asset } from "expo-asset";
-import { createAudioPlayer } from "expo-audio";
+import { createAudioPlayer, setAudioModeAsync, setIsAudioActiveAsync } from "expo-audio";
 import type { AudioPlayer } from "expo-audio";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -54,6 +54,7 @@ export default function BedtimeScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [showReadyToSleepDialog, setShowReadyToSleepDialog] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const stopCurrentPlayer = useCallback(() => {
     webAudioRef.current?.pause();
@@ -75,29 +76,62 @@ export default function BedtimeScreen() {
     }, [stopCurrentPlayer])
   );
 
-  const playOption = (option: SoundOption) => {
+  const preparePlaybackAudioSession = useCallback(async () => {
     if (Platform.OS === "web") {
-      const asset = Asset.fromModule(option.source);
-      const audio = new Audio(asset.uri);
-      audio.loop = true;
-      webAudioRef.current = audio;
-      audio.play()
-        .then(() => setIsPlaying(true))
-        .catch(() => setIsPlaying(false));
       return;
     }
 
-    const player = createAudioPlayer(option.source);
-    player.loop = true;
-    player.play();
-    playerRef.current = player;
-    setIsPlaying(true);
-  };
+    await setIsAudioActiveAsync(true);
+    await setAudioModeAsync({
+      allowsRecording: false,
+      interruptionMode: "doNotMix",
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false
+    });
+  }, []);
+
+  const playOption = useCallback(
+    async (option: SoundOption): Promise<boolean> => {
+      try {
+        if (Platform.OS === "web") {
+          const asset = Asset.fromModule(option.source);
+          const audio = new Audio(asset.uri);
+          audio.loop = true;
+          audio.muted = false;
+          audio.volume = 1;
+          webAudioRef.current = audio;
+          await audio.play();
+          setIsPlaying(true);
+          return true;
+        }
+
+        await preparePlaybackAudioSession();
+        const player = createAudioPlayer(option.source);
+        player.loop = true;
+        player.volume = 1;
+        playerRef.current = player;
+        player.play();
+        setIsPlaying(true);
+        return true;
+      } catch (error) {
+        console.warn("[bedtime] Failed to play sleep sound", error);
+        setIsPlaying(false);
+        setPlaybackError("声音暂时没有播放出来，请确认手机媒体音量已打开后再试。");
+        return false;
+      }
+    },
+    [preparePlaybackAudioSession]
+  );
 
   const chooseSound = async (option: SoundOption) => {
     stopCurrentPlayer();
     setSelectedId(option.id);
-    playOption(option);
+    setPlaybackError(null);
+    const started = await playOption(option);
+    if (!started) {
+      return;
+    }
 
     Promise.all([
       markSleepGeneratorUsed(option.label),
@@ -118,12 +152,20 @@ export default function BedtimeScreen() {
       playerRef.current?.pause();
       setIsPlaying(false);
     } else {
-      if (Platform.OS === "web") {
-        webAudioRef.current?.play().catch(() => setIsPlaying(false));
-      } else {
-        playerRef.current?.play();
+      setPlaybackError(null);
+      try {
+        if (Platform.OS === "web") {
+          await webAudioRef.current?.play();
+        } else {
+          await preparePlaybackAudioSession();
+          playerRef.current?.play();
+        }
+        setIsPlaying(true);
+      } catch (error) {
+        console.warn("[bedtime] Failed to resume sleep sound", error);
+        setPlaybackError("声音暂时没有播放出来，请确认手机媒体音量已打开后再试。");
+        setIsPlaying(false);
       }
-      setIsPlaying(true);
     }
   };
 
@@ -169,6 +211,7 @@ export default function BedtimeScreen() {
         <Text style={styles.currentTitle}>{selectedOption.label}</Text>
         <Text style={styles.body}>{selectedOption.body}</Text>
         <AppButton title={isPlaying ? "暂停" : "播放"} variant="gradient" onPress={togglePlayback} disabled={isClosing} />
+        {playbackError ? <Text style={styles.errorText}>{playbackError}</Text> : null}
       </AppCard>
 
       <View style={styles.soundGrid}>
@@ -278,6 +321,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     fontWeight: "700"
+  },
+  errorText: {
+    color: colors.danger,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800"
   },
   soundGrid: {
     flexDirection: "row",

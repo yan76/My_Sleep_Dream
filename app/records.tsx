@@ -1,9 +1,11 @@
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { ActivityIndicator, Image, ImageSourcePropType, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppDialog } from "@/components/common/AppDialog";
+import { GradientLayer } from "@/components/common/GradientLayer";
 import { isDemoMode } from "@/constants/demo";
+import { AllGrowthCanvas } from "@/features/growth/AllGrowthCanvas";
 import { buildGrowthStats, loadGrowthData, seedGrowthTestData } from "@/features/growth/growthData";
 import type { GrowthData } from "@/features/growth/growthData";
 import type { DailyExecutionRecord, SleepRecord, TodayReview } from "@/types/app";
@@ -32,10 +34,13 @@ const periodLabels: Record<GrowthDimension, string> = {
 
 const periodOrder: GrowthDimension[] = ["week", "month", "all"];
 
-const monthCompareMoonscape = require("../assets/ui/month-compare-moonscape.png");
 const monthChangeClock = require("../assets/ui/month-change-clock.png");
 const monthChangePhone = require("../assets/ui/month-change-phone.png");
 const monthChangeSunrise = require("../assets/ui/month-change-sunrise.png");
+const monthSummaryMoonScene = require("../assets/generated/yueban-month-ui/assets/images/image-month-summary-moon-scene-01.png");
+const monthSummaryEdgeBlend = require("../assets/generated/yueban-month-ui/assets/images/image-month-summary-edge-blend-01.png");
+const monthCompareScene = require("../assets/generated/yueban-month-ui/assets/images/image-month-compare-moonscape-clean.png");
+const monthCompareTrendIcon = require("../assets/generated/yueban-month-ui/assets/icons/icon-month-compare-trend-01.png");
 const journalEntryIcon = require("../assets/generated/yueban-growth-ui/assets/icons/icon-growth-journal-leaf-01.png");
 const growthStreakBadge = require("../assets/badges/streak-badge.png");
 const growthMoonBadge = require("../assets/badges/no-white-night-badge.png");
@@ -125,14 +130,29 @@ function StatusPill({ label, prefix = "↑" }: { label: string; prefix?: string 
   );
 }
 
-function HeroCopy({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
+function HeroCopy({
+  eyebrow,
+  title,
+  subtitle,
+  singleLineTitle = false
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  singleLineTitle?: boolean;
+}) {
   return (
     <View style={styles.hero}>
       <View style={styles.eyebrowRow}>
         <View style={styles.eyebrowDot} />
         <Text style={styles.eyebrow}>{eyebrow}</Text>
       </View>
-      <Text style={styles.heroTitle} numberOfLines={2}>
+      <Text
+        style={[styles.heroTitle, singleLineTitle && styles.heroTitleSingleLine]}
+        numberOfLines={singleLineTitle ? 1 : 2}
+        adjustsFontSizeToFit={singleLineTitle}
+        minimumFontScale={0.72}
+      >
         {title}
       </Text>
       <Text style={styles.heroSubtitle}>{subtitle}</Text>
@@ -140,7 +160,7 @@ function HeroCopy({ eyebrow, title, subtitle }: { eyebrow: string; title: string
   );
 }
 
-function ProgressCard({ stats, reviewCount }: { stats: GrowthStats; reviewCount: number }) {
+function ProgressCard({ stats, reviewCount, onOpenJournal }: { stats: GrowthStats; reviewCount: number; onOpenJournal: () => void }) {
   return (
     <GlassCard style={styles.progressCard}>
       <View style={styles.progressHeader}>
@@ -149,7 +169,7 @@ function ProgressCard({ stats, reviewCount }: { stats: GrowthStats; reviewCount:
       </View>
       <Text style={styles.bigGold}>{stats.averageLabel}</Text>
       <Text style={styles.cardBody}>{stats.averageCaption}</Text>
-      <JournalEntryCard reviewCount={reviewCount} embedded />
+      <JournalEntryCard reviewCount={reviewCount} embedded onPress={onOpenJournal} />
     </GlassCard>
   );
 }
@@ -168,10 +188,26 @@ function WeekTrend({ bars }: { bars: TrendBar[] }) {
               style={[
                 styles.trendBar,
                 bar.active ? styles.trendBarActive : styles.trendBarMuted,
-                bar.active ? trendBarGradientStyle : trendBarMutedGradientStyle,
                 { height: bar.height }
               ]}
-            />
+            >
+              <GradientLayer
+                direction="vertical"
+                stops={
+                  bar.active
+                    ? [
+                        { color: "#F4E1B9", location: 0 },
+                        { color: "#ECE7DC", location: 0.22 },
+                        { color: "#A8B1FF", location: 0.58 },
+                        { color: "#627AFF", location: 1 }
+                      ]
+                    : [
+                        { color: "rgba(255,255,255,0.13)", location: 0 },
+                        { color: "rgba(255,255,255,0.055)", location: 1 }
+                      ]
+                }
+              />
+            </View>
             <Text style={styles.axisLabel}>{bar.label}</Text>
           </View>
         ))}
@@ -367,7 +403,15 @@ function MoonAdvice({ title, body, buttonTitle, onPress }: { title: string; body
 
 function GradientButton({ title, onPress }: { title: string; onPress: () => void }) {
   return (
-    <Pressable style={[styles.gradientButton, gradientBackgroundStyle]} onPress={onPress}>
+    <Pressable style={styles.gradientButton} onPress={onPress}>
+      <GradientLayer
+        stops={[
+          { color: "#E6D5B8", location: 0 },
+          { color: "#F4ECDF", location: 0.35 },
+          { color: "#BFC4FF", location: 0.68 },
+          { color: "#8A97FF", location: 1 }
+        ]}
+      />
       <Text style={styles.gradientButtonText}>{title}</Text>
       {title.includes("故事") || title.includes("记录") ? <Text style={styles.gradientArrow}>›</Text> : null}
     </Pressable>
@@ -413,12 +457,27 @@ function clampChartValue(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function LineTrend({ title, range, points, compact = false }: { title: string; range: string; points: TrendPoint[]; compact?: boolean }) {
+function LineTrend({
+  title,
+  range,
+  points,
+  compact = false,
+  caption,
+  showScale = false
+}: {
+  title: string;
+  range: string;
+  points: TrendPoint[];
+  compact?: boolean;
+  caption?: string;
+  showScale?: boolean;
+}) {
   const [chartWidth, setChartWidth] = useState(0);
-  const chartHeight = compact ? 170 : 214;
-  const horizontalInset = compact ? 18 : 22;
+  const chartHeight = compact ? (showScale ? 142 : 170) : 214;
+  const horizontalInset = showScale ? 46 : compact ? 18 : 22;
+  const rightInset = showScale ? 14 : horizontalInset;
   const axisLabelWidth = 42;
-  const drawableWidth = Math.max(1, chartWidth - horizontalInset * 2);
+  const drawableWidth = Math.max(1, chartWidth - horizontalInset - rightInset);
   const maxAxisLabelLeft = Math.max(0, chartWidth - axisLabelWidth);
   const maxValue = Math.max(1, ...points.map((point) => point.value));
   const coords = points.map((point, index) => {
@@ -428,7 +487,7 @@ function LineTrend({ title, range, points, compact = false }: { title: string; r
   });
 
   return (
-    <GlassCard style={[styles.lineTrendCard, compact && styles.lineTrendCardCompact]}>
+    <GlassCard style={[styles.lineTrendCard, compact && styles.lineTrendCardCompact, showScale && styles.lineTrendCardMonth]}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
         <Text style={styles.goldSmall}>{range}</Text>
@@ -442,7 +501,19 @@ function LineTrend({ title, range, points, compact = false }: { title: string; r
           }
         }}
       >
-        <View style={[styles.chartBaseLine, { left: horizontalInset, right: horizontalInset }]} />
+        {showScale ? (
+          <>
+            {["多", "中", "少", "无"].map((label, index) => (
+              <Text key={label} style={[styles.chartScaleLabel, { top: 12 + index * 29 }]}>
+                {label}
+              </Text>
+            ))}
+            {[14, 43, 72, 101].map((top) => (
+              <View key={top} style={[styles.chartGridLine, { left: horizontalInset, right: rightInset, top }]} />
+            ))}
+          </>
+        ) : null}
+        <View style={[styles.chartBaseLine, { left: horizontalInset, right: rightInset }]} />
         {chartWidth > 0 ? (
           <>
             {coords.slice(0, -1).map((point, index) => (
@@ -475,6 +546,7 @@ function LineTrend({ title, range, points, compact = false }: { title: string; r
           </>
         ) : null}
       </View>
+      {caption ? <Text style={styles.lineTrendCaption}>{caption}</Text> : null}
     </GlassCard>
   );
 }
@@ -503,6 +575,96 @@ function ChangeList({ title, rows }: { title: string; rows: { icon?: string; ima
   );
 }
 
+function MonthSummaryCard({ stats }: { stats: GrowthStats }) {
+  const title = stats.stableNightCount > 0 ? `稳定 ${stats.stableNightCount} 晚` : "正在建立基线";
+  const body = stats.lessLateCount > 0
+    ? "比上个月更少被深夜拖走。"
+    : "现在先把事实留下来，趋势会慢慢清楚。";
+  const status = stats.monthStatusLabel.replace("正在变好", "更稳").replace("开始记录", "记录中");
+
+  return (
+    <GlassCard style={styles.monthSummaryCard}>
+      <View pointerEvents="none" style={styles.monthSummaryImageLayer}>
+        <Image source={monthSummaryMoonScene} style={styles.monthSummaryImageGlow} resizeMode="cover" blurRadius={7} />
+        <Image source={monthSummaryMoonScene} style={styles.monthSummaryImage} resizeMode="cover" />
+        <View style={styles.monthSummaryImageTone} />
+      </View>
+      <View pointerEvents="none" style={styles.monthSummaryImageBlend}>
+        <Image source={monthSummaryEdgeBlend} style={styles.monthSummaryImageBlendImage} resizeMode="stretch" />
+      </View>
+      <View pointerEvents="none" style={styles.monthSummaryImageBlendDeep}>
+        <Image source={monthSummaryEdgeBlend} style={styles.monthSummaryImageBlendImage} resizeMode="stretch" />
+      </View>
+      <View style={styles.monthSummaryCopy}>
+        <View style={styles.monthSummaryHeader}>
+          <Text style={styles.monthSummaryLabel}>本月结论</Text>
+          <StatusPill label={status} prefix="+" />
+        </View>
+        <Text style={styles.monthSummaryValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>
+          {title}
+        </Text>
+        <Text style={styles.monthSummaryBody} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.84}>
+          {body}
+        </Text>
+      </View>
+    </GlassCard>
+  );
+}
+
+function MonthMetricStrip({ stats }: { stats: GrowthStats }) {
+  const metrics = [
+    { label: "稳定晚数", value: `${stats.stableNightCount}晚` },
+    { label: "复盘完成", value: `${stats.monthReviewCount}次` },
+    { label: "提前收尾", value: `${stats.startBeforeTargetCount}次` },
+    { label: "醒来不错", value: `${stats.monthGoodMoodCount}天` }
+  ];
+
+  return (
+    <GlassCard style={styles.monthMetricStrip}>
+      {metrics.map((item, index) => (
+        <View key={item.label} style={[styles.monthMetricCell, index > 0 && styles.monthMetricDivider]}>
+          <Text style={styles.monthMetricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+            {item.label}
+          </Text>
+          <Text style={styles.monthMetricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+            {item.value}
+          </Text>
+        </View>
+      ))}
+    </GlassCard>
+  );
+}
+
+function MonthCompareCard({ stats }: { stats: GrowthStats }) {
+  return (
+    <GlassCard style={styles.monthCompareCard}>
+      <View pointerEvents="none" style={styles.monthCompareSceneLayer}>
+        <Image source={monthCompareScene} style={styles.monthCompareSceneGlow} resizeMode="cover" blurRadius={6} />
+        <Image source={monthCompareScene} style={styles.monthCompareScene} resizeMode="cover" />
+        <View style={styles.monthCompareSceneTone} />
+      </View>
+      <View pointerEvents="none" style={styles.monthCompareImageBlend}>
+        <Image source={monthSummaryEdgeBlend} style={styles.monthCompareImageBlendImage} resizeMode="stretch" />
+      </View>
+      <View pointerEvents="none" style={styles.monthCompareImageBlendDeep}>
+        <Image source={monthSummaryEdgeBlend} style={styles.monthCompareImageBlendImage} resizeMode="stretch" />
+      </View>
+      <View style={styles.monthCompareCopy}>
+        <Text style={styles.monthCompareLabel}>和上个月相比</Text>
+        <Text style={styles.monthCompareTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+          {stats.lessLateCount > 0 ? `少熬了 ${stats.lessLateCount} 晚` : "正在建立基线"}
+        </Text>
+        <Text style={styles.monthCompareBody} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.84}>
+          固定开始睡前仪式后，晚睡失控的次数正在下降。
+        </Text>
+      </View>
+      <View style={styles.monthCompareIconWrap}>
+        <Image source={monthCompareTrendIcon} style={styles.monthCompareTrendIcon} resizeMode="contain" />
+      </View>
+    </GlassCard>
+  );
+}
+
 function isMeaningfulExecution(record: DailyExecutionRecord): boolean {
   return record.status !== "not_started" || Boolean(record.readyToSleepAt || record.checkinCompletedAt || record.feedbackViewedAt);
 }
@@ -519,16 +681,25 @@ function countGrowthSignals(
   ]).size;
 }
 
-function JournalEntryCard({ reviewCount, embedded = false }: { reviewCount: number; embedded?: boolean }) {
+function JournalEntryCard({
+  reviewCount,
+  embedded = false,
+  onPress
+}: {
+  reviewCount: number;
+  embedded?: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={reviewCount > 0 ? "查看复盘日记本" : "查看复盘日记本，当前暂无复盘笔记"}
       style={({ pressed }) => [
         styles.journalEntryCard,
         embedded && styles.journalEntryCardEmbedded,
         pressed && styles.journalEntryPressed
       ]}
-      onPress={() => router.push("/journal")}
+      onPress={onPress}
     >
       <View style={styles.journalEntryIcon}>
         <Image source={journalEntryIcon} style={styles.journalEntryIconImage} resizeMode="contain" />
@@ -550,7 +721,7 @@ function JournalEntryCard({ reviewCount, embedded = false }: { reviewCount: numb
   );
 }
 
-function EmptyGrowthState() {
+function EmptyGrowthState({ onOpenJournal }: { onOpenJournal: () => void }) {
   return (
     <>
       <HeroCopy
@@ -562,7 +733,7 @@ function EmptyGrowthState() {
         <Text style={styles.emptyTitle}>现在还不用看数据</Text>
         <Text style={styles.emptyBody}>第一条记录只负责建立基线。哪怕今晚只是写一句复盘、选一个助眠入口，也已经足够开始。</Text>
       </GlassCard>
-      <JournalEntryCard reviewCount={0} />
+      <JournalEntryCard reviewCount={0} onPress={onOpenJournal} />
       <GradientButton title="开始今晚自救" onPress={() => router.push("/rescue")} />
     </>
   );
@@ -594,7 +765,17 @@ function GrowthReadinessCard({
   );
 }
 
-function WeekView({ stats, streak, reviewCount }: { stats: GrowthStats; streak: number; reviewCount: number }) {
+function WeekView({
+  stats,
+  streak,
+  reviewCount,
+  onOpenJournal
+}: {
+  stats: GrowthStats;
+  streak: number;
+  reviewCount: number;
+  onOpenJournal: () => void;
+}) {
   return (
     <>
       <HeroCopy
@@ -602,7 +783,7 @@ function WeekView({ stats, streak, reviewCount }: { stats: GrowthStats; streak: 
         title="这周，你会成为更好的自己"
         subtitle="不用每晚都完美，能看见变化就已经很好。"
       />
-      <ProgressCard stats={stats} reviewCount={reviewCount} />
+      <ProgressCard stats={stats} reviewCount={reviewCount} onOpenJournal={onOpenJournal} />
       <WeekTrend bars={stats.weekBars} />
       <MetricStrip stats={stats} />
       <AchievementRail stats={stats} streak={streak} />
@@ -620,43 +801,33 @@ function MonthView({ stats }: { stats: GrowthStats }) {
   return (
     <>
       <HeroCopy
-        eyebrow="变化正在累积"
-        title="过去一个月，你比之前更会照顾自己了"
+        eyebrow="本月成长记录"
+        title="这个月，你的夜晚开始变稳了"
         subtitle="把每周的小进步放在一起，你会更清楚地看见变化。"
+        singleLineTitle
       />
-      <View style={styles.metricGrid}>
-        <MetricCard label="平均入睡" value={stats.monthAverageLabel} valueColor="#F1DDAA" />
-        <MetricCard label="稳定晚数" value={`${stats.stableNightCount} 晚`} />
-        <MetricCard label="复盘完成" value={`${stats.cumulativeReviewCount} 次`} />
-        <MetricCard label="精神不错" value={`${stats.goodMoodCount} 天`} />
-      </View>
-      <GlassCard style={styles.compareCard}>
-        <View style={styles.moonScene}>
-          <Image source={monthCompareMoonscape} style={styles.monthCompareImage} resizeMode="contain" />
-        </View>
-        <View style={styles.compareCopy}>
-          <View style={styles.compareHeader}>
-            <Text style={[styles.cardLabel, styles.compareLabel]}>和上个月相比</Text>
-            <StatusPill label={stats.monthStatusLabel.replace("正在变好", "更稳")} prefix="+" />
-          </View>
-          <Text style={styles.compareTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>
-            {stats.lessLateCount > 0 ? `少熬了 ${stats.lessLateCount} 晚` : "正在建立基线"}
-          </Text>
-          <Text style={[styles.cardBody, styles.compareBody]}>固定开始睡前仪式后，晚睡失控的次数明显下降。</Text>
-        </View>
-      </GlassCard>
-      <LineTrend title="4 周变化趋势" range="W1 → W4" points={stats.monthPoints} />
+      <MonthSummaryCard stats={stats} />
+      <MonthMetricStrip stats={stats} />
+      <MonthCompareCard stats={stats} />
+      <LineTrend
+        title="4 周变化趋势"
+        range="W1 → W4"
+        points={stats.monthPoints}
+        compact
+        showScale
+        caption="记录越多，趋势会越清楚。"
+      />
       <ChangeList
         title="这一月最明显的变化"
         rows={[
           { image: monthChangeClock, label: "更常在 23:30 前开始收尾", value: `${stats.startBeforeTargetCount} 次` },
-          { image: monthChangePhone, label: "想刷手机时暂停下来", value: `${stats.pauseCount} 次` },
-          { image: monthChangeSunrise, label: "醒来觉得“还不错”", value: `${stats.goodMoodCount} 天` }
+          { image: monthChangePhone, label: "想刷手机时暂停下来", value: `${stats.monthPauseCount} 次` },
+          { image: monthChangeSunrise, label: "醒来觉得“还不错”", value: `${stats.monthGoodMoodCount} 天` }
         ]}
       />
       <MoonAdvice
         title="你不是偶尔做对一次，而是在慢慢建立新的夜晚习惯。"
-        body="继续坚持，距离助你改进睡 10 分钟，会更容易稳定下来。"
+        body="继续保持，睡前提前 10 分钟收尾，会更容易稳定下来。"
         buttonTitle="保存这个月的成长记录"
         onPress={() => undefined}
       />
@@ -711,7 +882,8 @@ function Content({
   records,
   executionRecords,
   reviews,
-  currentDate
+  currentDate,
+  onOpenJournal
 }: {
   dimension: GrowthDimension;
   stats: GrowthStats;
@@ -719,27 +891,28 @@ function Content({
   executionRecords: DailyExecutionRecord[];
   reviews: TodayReview[];
   currentDate: string;
+  onOpenJournal: () => void;
 }) {
   const streak = getCurrentExecutionStreak(executionRecords, currentDate) || getCurrentSleepStreak(records, currentDate);
   const signalCount = countGrowthSignals(records, executionRecords, reviews);
 
   if (signalCount === 0) {
-    return <EmptyGrowthState />;
+    return <EmptyGrowthState onOpenJournal={onOpenJournal} />;
   }
 
   if (dimension === "week") {
-    return <WeekView stats={stats} streak={streak} reviewCount={reviews.length} />;
+    return <WeekView stats={stats} streak={streak} reviewCount={reviews.length} onOpenJournal={onOpenJournal} />;
   }
 
-  const body = dimension === "month"
-    ? <MonthView stats={stats} />
-    : dimension === "all"
-      ? <AllView stats={stats} />
-      : null;
+  if (dimension === "month") {
+    return <MonthView stats={stats} />;
+  }
+
+  const body = dimension === "all" ? <AllView stats={stats} /> : null;
 
   return (
     <>
-      <JournalEntryCard reviewCount={reviews.length} />
+      <JournalEntryCard reviewCount={reviews.length} onPress={onOpenJournal} />
       <GrowthReadinessCard signalCount={signalCount} streak={streak} />
       {body}
     </>
@@ -754,7 +927,9 @@ export default function RecordsScreen() {
   const [periodExpanded, setPeriodExpanded] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [showPendingWeekRolloverDialog, setShowPendingWeekRolloverDialog] = useState(false);
+  const [showEmptyJournalDialog, setShowEmptyJournalDialog] = useState(false);
   const pendingWeekRolloverPrompted = useRef(false);
+  const totalReviewCount = data?.reviews.length ?? 0;
 
   const showPendingWeekRolloverPrompt = useCallback((nextData: GrowthData) => {
     if (!nextData.hasPendingWeekRollover || pendingWeekRolloverPrompted.current) {
@@ -816,7 +991,33 @@ export default function RecordsScreen() {
     }
   };
 
+  const openJournalOrPrompt = useCallback(() => {
+    if (totalReviewCount > 0) {
+      router.push("/journal");
+      return;
+    }
+
+    setShowEmptyJournalDialog(true);
+  }, [totalReviewCount]);
+
+  const saveAllGrowth = useCallback(() => {
+    const message = stats
+      ? [
+          "我的全部成长",
+          `累计复盘 ${stats.cumulativeReviewCount} 次`,
+          `稳定 ${stats.allStableNightCount} 晚`,
+          `最长连续 ${stats.longestStreak} 晚`,
+          "我不是原地不动，我已经走过了属于自己的夜晚。"
+        ].join("\n")
+      : "我的全部成长：每一次重新开始，都是在为明天的自己铺路。";
+
+    Share.share({ title: "我的全部成长", message }).catch((error) => {
+      console.warn("[growth] Failed to share all-growth summary", error);
+    });
+  }, [stats]);
+
   const isWeekDimension = dimension === "week";
+  const isAllDimension = dimension === "all";
   const weekHorizontalPadding = Math.round(Math.min(30, Math.max(22, metrics.width * 0.0563)));
   const weekContentTopPadding = metrics.isShortHeight ? 20 : 24;
   const weekContentGap = metrics.isShortHeight ? 16 : 18;
@@ -829,43 +1030,62 @@ export default function RecordsScreen() {
       </View>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: metrics.bottomNavReservedSpace }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          isAllDimension && styles.allScrollContent,
+          { paddingBottom: metrics.bottomNavReservedSpace }
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[
-            styles.content,
-            {
-              maxWidth: isWeekDimension ? metrics.width : metrics.contentMaxWidth,
-              paddingHorizontal: isWeekDimension ? weekHorizontalPadding : metrics.contentHorizontalPadding,
-              paddingTop: isWeekDimension ? weekContentTopPadding : metrics.contentTopPadding,
-              gap: isWeekDimension ? weekContentGap : metrics.contentGap
-            }
-          ]}
-        >
-          <Header
-            dimension={dimension}
-            expanded={periodExpanded}
-            onExpand={() => setPeriodExpanded(true)}
-            onChange={changeDimension}
+        {isAllDimension ? (
+          <AllGrowthCanvas
+            viewportWidth={metrics.width}
+            seeding={seeding}
+            showTestData={isDemoMode}
+            onBack={() => router.back()}
+            onChangePeriod={changeDimension}
+            onAddTestData={addTestData}
+            onOpenJournal={openJournalOrPrompt}
+            onOpenBadges={() => router.push("/badges")}
+            onSave={saveAllGrowth}
           />
-          {isDemoMode && !isWeekDimension ? <TestDataButton busy={seeding} onPress={addTestData} /> : null}
-          {loading || !stats || !data ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color="#E6D5B8" />
-              <Text style={styles.loadingText}>正在整理你的成长记录</Text>
-            </View>
-          ) : (
-            <Content
+        ) : (
+          <View
+            style={[
+              styles.content,
+              {
+                maxWidth: isWeekDimension ? metrics.width : metrics.contentMaxWidth,
+                paddingHorizontal: isWeekDimension ? weekHorizontalPadding : metrics.contentHorizontalPadding,
+                paddingTop: isWeekDimension ? weekContentTopPadding : metrics.contentTopPadding,
+                gap: isWeekDimension ? weekContentGap : metrics.contentGap
+              }
+            ]}
+          >
+            <Header
               dimension={dimension}
-              stats={stats}
-              records={data.records}
-              executionRecords={data.executionRecords}
-              reviews={data.reviews}
-              currentDate={data.currentDate}
+              expanded={periodExpanded}
+              onExpand={() => setPeriodExpanded(true)}
+              onChange={changeDimension}
             />
-          )}
-        </View>
+            {isDemoMode && !isWeekDimension ? <TestDataButton busy={seeding} onPress={addTestData} /> : null}
+            {loading || !stats || !data ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator color="#E6D5B8" />
+                <Text style={styles.loadingText}>正在整理你的成长记录</Text>
+              </View>
+            ) : (
+              <Content
+                dimension={dimension}
+                stats={stats}
+                records={data.records}
+                executionRecords={data.executionRecords}
+                reviews={data.reviews}
+                currentDate={data.currentDate}
+                onOpenJournal={openJournalOrPrompt}
+              />
+            )}
+          </View>
+        )}
       </ScrollView>
       <AppDialog
         visible={showPendingWeekRolloverDialog}
@@ -873,22 +1093,16 @@ export default function RecordsScreen() {
         body={"请查收这一周的成果。\n当你开始新一周计划后，成长模块 - 本周页面会切换到新的周期哦"}
         onConfirm={() => setShowPendingWeekRolloverDialog(false)}
       />
+      <AppDialog
+        visible={showEmptyJournalDialog}
+        title="日记本还在等第一句话"
+        body={"目前还没有复盘笔记。\n今晚哪怕只写一句“今天最占脑子的事”，这里也会替你收好，等以后回头看见自己的变化。"}
+        confirmTitle="知道啦"
+        onConfirm={() => setShowEmptyJournalDialog(false)}
+      />
     </SafeAreaView>
   );
 }
-
-const gradientBackgroundStyle = {
-  backgroundImage: "linear-gradient(100deg, #E6D5B8 0%, #F4ECDF 35%, #BFC4FF 68%, #8A97FF 100%)"
-} as ViewStyle;
-
-const trendBarGradientStyle = {
-  backgroundImage: "linear-gradient(180deg, #F4E1B9 0%, #ECE7DC 22%, #A8B1FF 58%, #627AFF 100%)",
-  boxShadow: "0 0 18px rgba(132,148,255,0.28)"
-} as ViewStyle;
-
-const trendBarMutedGradientStyle = {
-  backgroundImage: "linear-gradient(180deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.055) 100%)"
-} as ViewStyle;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -920,6 +1134,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1
+  },
+  allScrollContent: {
+    alignItems: "center"
   },
   content: {
     width: "100%",
@@ -1044,6 +1261,10 @@ const styles = StyleSheet.create({
     fontSize: 31,
     lineHeight: 38,
     fontWeight: "900"
+  },
+  heroTitleSingleLine: {
+    fontSize: 26,
+    lineHeight: 33
   },
   heroSubtitle: {
     color: "#A6ABBF",
@@ -1607,9 +1828,35 @@ const styles = StyleSheet.create({
   lineTrendCardCompact: {
     minHeight: 302
   },
+  lineTrendCardMonth: {
+    minHeight: 218,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 13,
+    gap: 7,
+    borderRadius: 22,
+    backgroundColor: "rgba(13,16,32,0.74)"
+  },
   lineChart: {
     position: "relative",
     marginTop: 8
+  },
+  chartGridLine: {
+    position: "absolute",
+    height: 0,
+    borderStyle: "dashed",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.055)"
+  },
+  chartScaleLabel: {
+    position: "absolute",
+    left: 1,
+    width: 20,
+    color: "#8E93AE",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+    textAlign: "center"
   },
   chartBaseLine: {
     position: "absolute",
@@ -1643,6 +1890,251 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900",
     textAlign: "center"
+  },
+  lineTrendCaption: {
+    color: "#8E93AE",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: -4
+  },
+  monthSummaryCard: {
+    minHeight: 126,
+    position: "relative",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: "rgba(24,28,49,0.78)"
+  },
+  monthSummaryImageLayer: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "58%",
+    backgroundColor: "#111426",
+    overflow: "hidden",
+    zIndex: 0
+  },
+  monthSummaryImageBlend: {
+    position: "absolute",
+    left: "17%",
+    top: 0,
+    bottom: 0,
+    right: -14,
+    zIndex: 1,
+    opacity: 1
+  },
+  monthSummaryImageBlendDeep: {
+    position: "absolute",
+    left: "34%",
+    top: 0,
+    bottom: 0,
+    right: -14,
+    zIndex: 1,
+    opacity: 0.78
+  },
+  monthSummaryImageBlendImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%"
+  },
+  monthSummaryImage: {
+    position: "absolute",
+    left: "-8%",
+    top: 0,
+    width: "108%",
+    height: "100%"
+  },
+  monthSummaryImageGlow: {
+    position: "absolute",
+    left: "-12%",
+    top: "-6%",
+    width: "116%",
+    height: "112%",
+    opacity: 0.24,
+    transform: [{ scale: 1.03 }]
+  },
+  monthSummaryImageTone: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,10,28,0.06)"
+  },
+  monthSummaryCopy: {
+    minWidth: 0,
+    minHeight: 126,
+    justifyContent: "center",
+    paddingLeft: "42%",
+    paddingRight: 18,
+    paddingVertical: 12,
+    position: "relative",
+    gap: 5,
+    zIndex: 2
+  },
+  monthSummaryHeader: {
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  monthSummaryLabel: {
+    color: "#A6ABBF",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900"
+  },
+  monthSummaryValue: {
+    color: "#F1DDAA",
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: "900"
+  },
+  monthSummaryBody: {
+    color: "#A6ABBF",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700"
+  },
+  monthMetricStrip: {
+    minHeight: 72,
+    flexDirection: "row",
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+    alignItems: "center",
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.055)"
+  },
+  monthMetricCell: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingHorizontal: 4
+  },
+  monthMetricDivider: {
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(255,255,255,0.11)"
+  },
+  monthMetricLabel: {
+    color: "#A6ABBF",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  monthMetricValue: {
+    color: "#F1DDAA",
+    fontSize: 26,
+    lineHeight: 31,
+    fontWeight: "900"
+  },
+  monthCompareCard: {
+    minHeight: 96,
+    paddingLeft: "38%",
+    paddingRight: 14,
+    paddingVertical: 10,
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 22,
+    backgroundColor: "rgba(24,28,49,0.72)",
+    overflow: "hidden"
+  },
+  monthCompareSceneLayer: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: "56%",
+    backgroundColor: "#111426",
+    overflow: "hidden",
+    zIndex: 0
+  },
+  monthCompareImageBlend: {
+    position: "absolute",
+    left: "18%",
+    top: 0,
+    bottom: 0,
+    right: -14,
+    zIndex: 1,
+    opacity: 0.98
+  },
+  monthCompareImageBlendDeep: {
+    position: "absolute",
+    left: "36%",
+    top: 0,
+    bottom: 0,
+    right: -14,
+    zIndex: 1,
+    opacity: 0.72
+  },
+  monthCompareImageBlendImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%"
+  },
+  monthCompareScene: {
+    position: "absolute",
+    left: "-27%",
+    top: 0,
+    width: "118%",
+    height: "100%"
+  },
+  monthCompareSceneGlow: {
+    position: "absolute",
+    left: "-31%",
+    top: "-5%",
+    width: "126%",
+    height: "110%",
+    opacity: 0.28,
+    transform: [{ scale: 1.03 }]
+  },
+  monthCompareSceneTone: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,10,28,0.07)"
+  },
+  monthCompareCopy: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+    gap: 2,
+    position: "relative",
+    zIndex: 2
+  },
+  monthCompareLabel: {
+    color: "#A6ABBF",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  monthCompareTitle: {
+    color: "#F1DDAA",
+    fontSize: 25,
+    lineHeight: 30,
+    fontWeight: "900"
+  },
+  monthCompareBody: {
+    color: "#A6ABBF",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700"
+  },
+  monthCompareIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    zIndex: 2
+  },
+  monthCompareTrendIcon: {
+    width: 38,
+    height: 38
   },
   changeListCard: {
     padding: 26,

@@ -7,11 +7,14 @@ import {
   useAudioRecorderState
 } from "expo-audio";
 import type { AudioPlayer } from "expo-audio";
+import type { NavigationAction } from "@react-navigation/native";
+import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/common/AppButton";
 import { AppCard } from "@/components/common/AppCard";
+import { AppDialog } from "@/components/common/AppDialog";
 import { Screen } from "@/components/common/Screen";
 import { colors } from "@/constants/colors";
 import { markSleepAudioDeleted, markSleepAudioEnabled } from "@/storage/dailyExecutionStorage";
@@ -30,6 +33,7 @@ import {
   startSleepMonitoring,
   stopSleepMonitoring
 } from "@/services/sleepAudioMonitoringService";
+import { setNavigationGuard } from "@/services/navigationGuard";
 import { SleepAudioSession } from "@/types/app";
 
 type PreviewClip = {
@@ -38,9 +42,15 @@ type PreviewClip = {
   durationMs?: number;
 };
 
+type PreviewDialog = "operation" | "leave" | null;
+type PendingPreviewNavigation =
+  | { kind: "action"; action: NavigationAction }
+  | { kind: "route"; href: string; method: "push" | "replace" };
+
 const maxStoredWebRecordingBytes = 3 * 1024 * 1024;
 
 export default function SleepMonitorScreen() {
+  const navigation = useNavigation();
   const fallbackRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const fallbackRecorderState = useAudioRecorderState(fallbackRecorder);
   const [date, setDate] = useState<string | null>(null);
@@ -50,14 +60,30 @@ export default function SleepMonitorScreen() {
   const [previewing, setPreviewing] = useState(false);
   const [previewClipIndex, setPreviewClipIndex] = useState<number | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewDialog, setPreviewDialog] = useState<PreviewDialog>(null);
+  const [leavingAfterPreview, setLeavingAfterPreview] = useState(false);
   const playerRef = useRef<AudioPlayer | null>(null);
   const playerSubscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const playbackStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webAudioRef = useRef<HTMLAudioElement | null>(null);
   const fallbackRecordingRef = useRef(false);
   const previewRunRef = useRef(0);
+  const pendingNavigationRef = useRef<PendingPreviewNavigation | null>(null);
+
+  const clearPlaybackStartTimeout = useCallback(() => {
+    if (playbackStartTimeoutRef.current) {
+      clearTimeout(playbackStartTimeoutRef.current);
+      playbackStartTimeoutRef.current = null;
+    }
+  }, []);
 
   const cleanupPlayer = useCallback(() => {
-    playerSubscriptionRef.current?.remove();
+    clearPlaybackStartTimeout();
+    try {
+      playerSubscriptionRef.current?.remove();
+    } catch {
+      // expo-audio may already have detached the native listener after playback ends.
+    }
     playerSubscriptionRef.current = null;
 
     webAudioRef.current?.pause();
@@ -85,7 +111,13 @@ export default function SleepMonitorScreen() {
     } catch {
       // The player may already have been released by a native completion event.
     }
-  }, []);
+
+    try {
+      player.release();
+    } catch {
+      // Shared objects throw if release races with another native cleanup path.
+    }
+  }, [clearPlaybackStartTimeout]);
 
   const stopPreview = useCallback(() => {
     previewRunRef.current += 1;
@@ -115,6 +147,48 @@ export default function SleepMonitorScreen() {
     }, [stopPreview])
   );
 
+  usePreventRemove(previewing && !leavingAfterPreview, ({ data }) => {
+    pendingNavigationRef.current = { kind: "action", action: data.action };
+    setPreviewDialog("leave");
+  });
+
+  useEffect(() => {
+    if (!previewing || leavingAfterPreview) {
+      return undefined;
+    }
+
+    return setNavigationGuard((target) => {
+      pendingNavigationRef.current = { kind: "route", ...target };
+      setPreviewDialog("leave");
+      return true;
+    });
+  }, [leavingAfterPreview, previewing]);
+
+  useEffect(() => {
+    if (!leavingAfterPreview || previewing) {
+      return;
+    }
+
+    const pendingNavigation = pendingNavigationRef.current;
+    pendingNavigationRef.current = null;
+    setLeavingAfterPreview(false);
+    if (!pendingNavigation) {
+      return;
+    }
+
+    if (pendingNavigation.kind === "action") {
+      navigation.dispatch(pendingNavigation.action);
+      return;
+    }
+
+    if (pendingNavigation.method === "replace") {
+      router.replace(pendingNavigation.href as never);
+      return;
+    }
+
+    router.push(pendingNavigation.href as never);
+  }, [leavingAfterPreview, navigation, previewing]);
+
   const playableClips = useMemo(() => createPlayableClips(session), [session]);
   const nativeMonitoringAvailable = isNativeSleepAudioMonitoringAvailable();
 
@@ -130,6 +204,11 @@ export default function SleepMonitorScreen() {
 
   const start = async () => {
     if (busy) {
+      return;
+    }
+
+    if (previewing) {
+      setPreviewDialog("operation");
       return;
     }
 
@@ -246,6 +325,11 @@ export default function SleepMonitorScreen() {
       return;
     }
 
+    if (previewing) {
+      setPreviewDialog("operation");
+      return;
+    }
+
     const cycleDate = date ?? (await resolveCurrentCycleDate());
     stopPreview();
     setBusy(true);
@@ -334,15 +418,37 @@ export default function SleepMonitorScreen() {
         playerRef.current = player;
         setPreviewClipIndex(index);
         playerSubscriptionRef.current = player.addListener("playbackStatusUpdate", (status) => {
-          if (runId !== previewRunRef.current) {
+          if (runId !== previewRunRef.current || playerRef.current !== player) {
             return;
           }
 
-          if (status.didJustFinish) {
-            void playClipAt(index + 1, runId);
+          if (status.playing) {
+            clearPlaybackStartTimeout();
+          }
+
+          if (status.didJustFinish || status.playbackState === "ended") {
+            setTimeout(() => {
+              if (runId === previewRunRef.current && playerRef.current === player) {
+                void playClipAt(index + 1, runId);
+              }
+            }, 0);
           }
         });
         player.play();
+        playbackStartTimeoutRef.current = setTimeout(() => {
+          if (runId !== previewRunRef.current || playerRef.current !== player) {
+            return;
+          }
+
+          if (player.playing) {
+            return;
+          }
+
+          cleanupPlayer();
+          setPreviewing(false);
+          setPreviewClipIndex(null);
+          setPreviewError("音频已保存，但播放器没有成功开始。请确认媒体音量已打开，或删除记录后重新监听一次。");
+        }, 1800);
       } catch (error) {
         console.warn("[sleep-audio] Failed to preview recording", error);
         cleanupPlayer();
@@ -351,13 +457,14 @@ export default function SleepMonitorScreen() {
         setPreviewError("音频预览失败，文件可能已被清理或监听记录已删除。");
       }
     },
-    [cleanupPlayer, playableClips, preparePreviewAudioSession]
+    [clearPlaybackStartTimeout, cleanupPlayer, playableClips, preparePreviewAudioSession]
   );
 
   const togglePreview = () => {
     if (previewing) {
       stopPreview();
       setPreviewError(null);
+      setPreviewDialog(null);
       return;
     }
 
@@ -378,10 +485,37 @@ export default function SleepMonitorScreen() {
     }
   }, [canPreview, previewing, stopPreview]);
 
+  const dismissPreviewDialog = () => {
+    pendingNavigationRef.current = null;
+    setLeavingAfterPreview(false);
+    setPreviewDialog(null);
+  };
+
+  const continueAfterPreview = () => {
+    setPreviewDialog(null);
+    setLeavingAfterPreview(true);
+    stopPreview();
+  };
+
+  const requestRouteLeave = (href: string, method: "push" | "replace") => {
+    if (previewing) {
+      pendingNavigationRef.current = { kind: "route", href, method };
+      setPreviewDialog("leave");
+      return;
+    }
+
+    if (method === "replace") {
+      router.replace(href as never);
+      return;
+    }
+
+    router.push(href as never);
+  };
+
   return (
     <Screen>
       <View style={styles.top}>
-        <Pressable style={styles.ghost} onPress={() => router.replace("/")}>
+        <Pressable style={styles.ghost} onPress={() => requestRouteLeave("/", "replace")}>
           <Text style={styles.ghostText}>返回首页</Text>
         </Pressable>
       </View>
@@ -456,6 +590,22 @@ export default function SleepMonitorScreen() {
       {hasFinished || denied || failed ? (
         <AppButton title={busy ? "正在删除..." : "删除今晚监听记录"} variant="danger" onPress={remove} disabled={busy} />
       ) : null}
+      <AppDialog
+        visible={previewDialog === "operation"}
+        title="先暂停预览"
+        body="正在预览今晚的本机录音。请先点“停止预览”，再开始新的监听或删除记录。"
+        confirmTitle="知道啦"
+        onConfirm={dismissPreviewDialog}
+      />
+      <AppDialog
+        visible={previewDialog === "leave"}
+        title="预览会被中断"
+        body="你正在预览今晚的本机录音。离开睡眠监听页后，预览会自动停止。"
+        cancelTitle="先留在这里"
+        confirmTitle="继续离开"
+        onCancel={dismissPreviewDialog}
+        onConfirm={continueAfterPreview}
+      />
     </Screen>
   );
 }

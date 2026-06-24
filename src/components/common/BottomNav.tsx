@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { requestNavigationGuard } from "@/services/navigationGuard";
 import { useResponsiveMetrics } from "@/utils/responsive";
 
 type BottomNavProps = {
@@ -50,7 +51,13 @@ export function BottomNav({ active }: BottomNavProps) {
         return (
           <Pressable
             key={item.key}
-            onPress={() => router.push(item.href)}
+            onPress={() => {
+              if (requestNavigationGuard({ href: item.href, method: "push" })) {
+                return;
+              }
+
+              router.push(item.href);
+            }}
             style={[styles.item, metrics.isCompactWidth && styles.itemCompact]}
           >
             <View style={styles.iconWrap}>

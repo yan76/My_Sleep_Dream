@@ -115,16 +115,38 @@ export function SleepAudioSummaryCard({ session, onDeleted }: SleepAudioSummaryC
   const summary = session?.summary;
 
   const stopPlayback = useCallback(() => {
-    playerSubscriptionRef.current?.remove();
+    try {
+      playerSubscriptionRef.current?.remove();
+    } catch {
+      // expo-audio may already have detached the native listener after playback ends.
+    }
     playerSubscriptionRef.current = null;
     webAudioRef.current?.pause();
     if (webAudioRef.current) {
       webAudioRef.current.currentTime = 0;
     }
     webAudioRef.current = null;
-    playerRef.current?.pause();
-    playerRef.current?.remove();
+    const player = playerRef.current;
     playerRef.current = null;
+    if (player) {
+      try {
+        player.pause();
+      } catch {
+        // The player may already have been released by a native completion event.
+      }
+
+      try {
+        player.remove();
+      } catch {
+        // The player may already have been released by a native completion event.
+      }
+
+      try {
+        player.release();
+      } catch {
+        // Shared objects throw if release races with another native cleanup path.
+      }
+    }
     setPlayingEventId(null);
   }, []);
 
@@ -157,8 +179,16 @@ export function SleepAudioSummaryCard({ session, onDeleted }: SleepAudioSummaryC
       const player = createAudioPlayer({ uri: normalizeClipUri(event.localClipUri) });
       playerRef.current = player;
       playerSubscriptionRef.current = player.addListener("playbackStatusUpdate", (status) => {
-        if (status.didJustFinish) {
-          stopPlayback();
+        if (playerRef.current !== player) {
+          return;
+        }
+
+        if (status.didJustFinish || status.playbackState === "ended") {
+          setTimeout(() => {
+            if (playerRef.current === player) {
+              stopPlayback();
+            }
+          }, 0);
         }
       });
       player.play();

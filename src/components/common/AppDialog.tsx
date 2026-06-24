@@ -7,17 +7,34 @@ type AppDialogProps = {
   title: string;
   body: string;
   confirmTitle?: string;
+  cancelTitle?: string;
   onConfirm: () => void;
+  onCancel?: () => void;
 };
 
-export function AppDialog({ visible, title, body, confirmTitle = "确定", onConfirm }: AppDialogProps) {
+export function AppDialog({
+  visible,
+  title,
+  body,
+  confirmTitle = "确定",
+  cancelTitle,
+  onConfirm,
+  onCancel
+}: AppDialogProps) {
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onConfirm}>
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel ?? onConfirm}>
       <View style={styles.overlay}>
         <View style={styles.dialog}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.body}>{body}</Text>
-          <AppButton title={confirmTitle} variant="gradient" onPress={onConfirm} size="md" />
+          {onCancel ? (
+            <View style={styles.actions}>
+              <AppButton title={cancelTitle ?? "取消"} variant="ghost" onPress={onCancel} size="md" style={styles.actionButton} />
+              <AppButton title={confirmTitle} variant="gradient" onPress={onConfirm} size="md" style={styles.actionButton} />
+            </View>
+          ) : (
+            <AppButton title={confirmTitle} variant="gradient" onPress={onConfirm} size="md" />
+          )}
         </View>
       </View>
     </Modal>
@@ -53,5 +70,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     fontWeight: "700"
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 10
+  },
+  actionButton: {
+    flex: 1
   }
 });

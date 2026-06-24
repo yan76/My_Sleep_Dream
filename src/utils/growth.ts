@@ -24,6 +24,9 @@ export type GrowthStats = {
   reviewCount: number;
   pauseCount: number;
   goodMoodCount: number;
+  monthReviewCount: number;
+  monthPauseCount: number;
+  monthGoodMoodCount: number;
   stableNightCount: number;
   allStableNightCount: number;
   cumulativeReviewCount: number;
@@ -526,6 +529,9 @@ export function buildGrowthStats(
   const weekSessions = sessionsInRange(sessions, weekStart, weekEnd);
   const monthSessions = sessionsInRange(sessions, monthStart, monthEnd);
   const weekReviews = reviewsInRange(reviews, weekStart, weekEnd);
+  const monthReviewCount = countReviewDates([], sessionsByDate, reviews, (date) => inRange(date, monthStart, monthEnd));
+  const monthPauseCount = monthSessions.reduce((sum, session) => sum + sessionPauseCount(session), 0);
+  const monthGoodMoodCount = monthlyRecords.filter((record) => goodMoodLabels.has(record.moodNextMorning ?? "")).length;
   const stableNightCount = countCompletedRescuePlanDates({
     sessionsByDate,
     legacySleepRecords: records,
@@ -554,6 +560,9 @@ export function buildGrowthStats(
     reviewCount: weekReviews.length,
     pauseCount: weekSessions.reduce((sum, session) => sum + sessionPauseCount(session), 0),
     goodMoodCount: weeklyRecords.filter((record) => goodMoodLabels.has(record.moodNextMorning ?? "")).length,
+    monthReviewCount,
+    monthPauseCount,
+    monthGoodMoodCount,
     stableNightCount,
     allStableNightCount,
     cumulativeReviewCount: reviews.length,
@@ -594,11 +603,24 @@ export function buildGrowthStatsFromExecutionRecords(
     (sum, record) => sum + executionPauseCount(record, sessionsByDate),
     0
   );
+  const monthlyPauseCount = monthlyExecutions.reduce(
+    (sum, record) => sum + executionPauseCount(record, sessionsByDate),
+    0
+  );
   const weeklyGoodMoodCount = weeklyExecutions.filter(executionHasGoodMorningMood).length;
+  const monthlyGoodMoodCount = monthlyExecutions.filter(executionHasGoodMorningMood).length;
   const weeklyLegacyGoodMoodCount = recordsInRange(legacyRecords, weekStart, weekEnd).filter((record) =>
     goodMoodLabels.has(record.moodNextMorning ?? "")
   ).length;
+  const monthlyLegacyGoodMoodCount = recordsInRange(legacyRecords, monthStart, monthEnd).filter((record) =>
+    goodMoodLabels.has(record.moodNextMorning ?? "")
+  ).length;
   const weeklyReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, (date) => inRange(date, weekStart, weekEnd));
+  const monthlyReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, (date) => inRange(date, monthStart, monthEnd));
+  const monthlyLegacyPauseCount = sessionsInRange(legacySessions, monthStart, monthEnd).reduce(
+    (sum, session) => sum + sessionPauseCount(session),
+    0
+  );
   const allReviewCount = countReviewDates(executionRecords, sessionsByDate, reviews, () => true);
   const stableNightCount = countCompletedRescuePlanDates({
     executionRecords,
@@ -618,6 +640,9 @@ export function buildGrowthStatsFromExecutionRecords(
     reviewCount: weeklyReviewCount,
     pauseCount: weeklyPauseCount + legacyStats.pauseCount,
     goodMoodCount: weeklyGoodMoodCount + weeklyLegacyGoodMoodCount,
+    monthReviewCount: monthlyReviewCount,
+    monthPauseCount: monthlyPauseCount + monthlyLegacyPauseCount,
+    monthGoodMoodCount: monthlyGoodMoodCount + monthlyLegacyGoodMoodCount,
     stableNightCount,
     allStableNightCount,
     cumulativeReviewCount: allReviewCount,

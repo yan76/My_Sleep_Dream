@@ -1,0 +1,376 @@
+[
+  {
+    "id": "canvas",
+    "type": "vector",
+    "source_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 466,
+      "height": 789
+    },
+    "scaled_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 750,
+      "height": 1270
+    },
+    "z_index": 0,
+    "notes": "Full current source image canvas."
+  },
+  {
+    "id": "background-top-purple-glow",
+    "type": "vector",
+    "source_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 150,
+      "height": 102
+    },
+    "scaled_bbox": {
+      "x": 0,
+      "y": 0,
+      "width": 241,
+      "height": 164
+    },
+    "z_index": 1,
+    "notes": "Soft top-left purple glow; should be code/vector."
+  },
+  {
+    "id": "background-right-blue-glow",
+    "type": "vector",
+    "source_bbox": {
+      "x": 383,
+      "y": 79,
+      "width": 83,
+      "height": 225
+    },
+    "scaled_bbox": {
+      "x": 616,
+      "y": 127,
+      "width": 134,
+      "height": 362
+    },
+    "z_index": 1,
+    "notes": "Right side blue glow; should be code/vector."
+  },
+  {
+    "id": "top-back-button",
+    "type": "vector",
+    "source_bbox": {
+      "x": 23,
+      "y": 27,
+      "width": 76,
+      "height": 36
+    },
+    "scaled_bbox": {
+      "x": 37,
+      "y": 43,
+      "width": 122,
+      "height": 58
+    },
+    "z_index": 5,
+    "notes": "Back pill shape."
+  },
+  {
+    "id": "top-period-control",
+    "type": "vector",
+    "source_bbox": {
+      "x": 240,
+      "y": 24,
+      "width": 205,
+      "height": 43
+    },
+    "scaled_bbox": {
+      "x": 386,
+      "y": 39,
+      "width": 330,
+      "height": 69
+    },
+    "z_index": 5,
+    "notes": "Segmented period control."
+  },
+  {
+    "id": "text-eyebrow",
+    "type": "text",
+    "source_bbox": {
+      "x": 22,
+      "y": 89,
+      "width": 104,
+      "height": 17
+    },
+    "scaled_bbox": {
+      "x": 35,
+      "y": 143,
+      "width": 167,
+      "height": 27
+    },
+    "z_index": 10,
+    "notes": "??????"
+  },
+  {
+    "id": "text-hero-title",
+    "type": "text",
+    "source_bbox": {
+      "x": 22,
+      "y": 114,
+      "width": 357,
+      "height": 30
+    },
+    "scaled_bbox": {
+      "x": 35,
+      "y": 183,
+      "width": 575,
+      "height": 48
+    },
+    "z_index": 10,
+    "notes": "?????????????"
+  },
+  {
+    "id": "text-hero-subtitle",
+    "type": "text",
+    "source_bbox": {
+      "x": 22,
+      "y": 152,
+      "width": 303,
+      "height": 16
+    },
+    "scaled_bbox": {
+      "x": 35,
+      "y": 245,
+      "width": 488,
+      "height": 26
+    },
+    "z_index": 10,
+    "notes": "???????????????????????"
+  },
+  {
+    "id": "summary-card",
+    "type": "vector",
+    "source_bbox": {
+      "x": 21,
+      "y": 176,
+      "width": 423,
+      "height": 126
+    },
+    "scaled_bbox": {
+      "x": 34,
+      "y": 283,
+      "width": 681,
+      "height": 203
+    },
+    "z_index": 8,
+    "notes": "Main monthly conclusion glass card."
+  },
+  {
+    "id": "metric-strip-card",
+    "type": "vector",
+    "source_bbox": {
+      "x": 21,
+      "y": 310,
+      "width": 423,
+      "height": 72
+    },
+    "scaled_bbox": {
+      "x": 34,
+      "y": 499,
+      "width": 681,
+      "height": 116
+    },
+    "z_index": 8,
+    "notes": "Compact four-cell metric strip."
+  },
+  {
+    "id": "compare-card",
+    "type": "vector",
+    "source_bbox": {
+      "x": 21,
+      "y": 394,
+      "width": 423,
+      "height": 95
+    },
+    "scaled_bbox": {
+      "x": 34,
+      "y": 634,
+      "width": 681,
+      "height": 153
+    },
+    "z_index": 8,
+    "notes": "Previous month comparison glass card."
+  },
+  {
+    "id": "trend-card",
+    "type": "vector",
+    "source_bbox": {
+      "x": 21,
+      "y": 496,
+      "width": 423,
+      "height": 145
+    },
+    "scaled_bbox": {
+      "x": 34,
+      "y": 798,
+      "width": 681,
+      "height": 233
+    },
+    "z_index": 8,
+    "notes": "Four week trend line card."
+  },
+  {
+    "id": "change-list-card",
+    "type": "vector",
+    "source_bbox": {
+      "x": 21,
+      "y": 648,
+      "width": 423,
+      "height": 137
+    },
+    "scaled_bbox": {
+      "x": 34,
+      "y": 1043,
+      "width": 681,
+      "height": 220
+    },
+    "z_index": 8,
+    "notes": "Monthly changes grouped list."
+  },
+  {
+    "id": "image-month-summary-moon-scene-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 32,
+      "y": 189,
+      "width": 157,
+      "height": 97
+    },
+    "scaled_bbox": {
+      "x": 52,
+      "y": 304,
+      "width": 253,
+      "height": 156
+    },
+    "z_index": 12,
+    "asset": "assets/images/image-month-summary-moon-scene-01.png",
+    "transparent_required": false,
+    "notes": "Moon/cloud scene inside the primary monthly summary card; background is part of the image."
+  },
+  {
+    "id": "image-month-compare-moonscape-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 30,
+      "y": 409,
+      "width": 144,
+      "height": 70
+    },
+    "scaled_bbox": {
+      "x": 48,
+      "y": 658,
+      "width": 232,
+      "height": 113
+    },
+    "z_index": 12,
+    "asset": "assets/images/image-month-compare-moonscape-01.png",
+    "transparent_required": false,
+    "notes": "Moonrise mountains illustration in the previous-month comparison card."
+  },
+  {
+    "id": "icon-month-compare-trend-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 365,
+      "y": 403,
+      "width": 63,
+      "height": 63
+    },
+    "scaled_bbox": {
+      "x": 587,
+      "y": 649,
+      "width": 101,
+      "height": 101
+    },
+    "z_index": 14,
+    "asset": "assets/icons/icon-month-compare-trend-01.png",
+    "transparent_required": true,
+    "notes": "Trend arrow icon art. The circular well/background should be recreated in front-end code."
+  },
+  {
+    "id": "chart-month-four-week-line-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 42,
+      "y": 533,
+      "width": 383,
+      "height": 83
+    },
+    "scaled_bbox": {
+      "x": 68,
+      "y": 858,
+      "width": 616,
+      "height": 134
+    },
+    "z_index": 12,
+    "asset": "assets/charts/chart-month-four-week-line-01.png",
+    "transparent_required": false,
+    "notes": "Static crop of the W1-W4 trend line plot area for reference or direct static use."
+  },
+  {
+    "id": "icon-month-change-clock-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 44,
+      "y": 678,
+      "width": 42,
+      "height": 42
+    },
+    "scaled_bbox": {
+      "x": 71,
+      "y": 1091,
+      "width": 68,
+      "height": 68
+    },
+    "z_index": 14,
+    "asset": "assets/icons/icon-month-change-clock-01.png",
+    "transparent_required": true,
+    "notes": "Clock icon art. The circular well/background should be recreated in front-end code."
+  },
+  {
+    "id": "icon-month-change-phone-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 44,
+      "y": 712,
+      "width": 42,
+      "height": 42
+    },
+    "scaled_bbox": {
+      "x": 71,
+      "y": 1146,
+      "width": 68,
+      "height": 68
+    },
+    "z_index": 14,
+    "asset": "assets/icons/icon-month-change-phone-01.png",
+    "transparent_required": true,
+    "notes": "Phone pause icon art. The circular well/background should be recreated in front-end code."
+  },
+  {
+    "id": "icon-month-change-sunrise-01",
+    "type": "bitmap",
+    "source_bbox": {
+      "x": 44,
+      "y": 744,
+      "width": 42,
+      "height": 42
+    },
+    "scaled_bbox": {
+      "x": 71,
+      "y": 1197,
+      "width": 68,
+      "height": 68
+    },
+    "z_index": 14,
+    "asset": "assets/icons/icon-month-change-sunrise-01.png",
+    "transparent_required": true,
+    "notes": "Sunrise mood icon art. The circular well/background should be recreated in front-end code."
+  }
+]

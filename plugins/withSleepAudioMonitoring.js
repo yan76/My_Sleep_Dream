@@ -298,6 +298,13 @@ public class SleepAudioMonitoringModule extends ReactContextBaseJavaModule {
     map.putString("startedAt", status.optString("startedAt", null));
     map.putString("stoppedAt", status.optString("stoppedAt", null));
     map.putInt("eventCount", Math.max(status.optInt("eventCount", 0), events == null ? 0 : events.length()));
+    String localAudioUri = status.optString("localAudioUri", null);
+    if ((localAudioUri == null || localAudioUri.length() == 0) && resolvedDate != null && resolvedDate.length() > 0) {
+      localAudioUri = previewClipFromDirectory(context, resolvedDate);
+    }
+    if (localAudioUri != null && localAudioUri.length() > 0) {
+      map.putString("localAudioUri", localAudioUri);
+    }
     if (lastError != null) {
       map.putString("lastError", lastError);
     } else if (status.has("lastError")) {
@@ -352,7 +359,7 @@ public class SleepAudioMonitoringModule extends ReactContextBaseJavaModule {
   private JSONArray clipsFromDirectory(Context context, String date, String sessionId) throws Exception {
     JSONArray events = new JSONArray();
     File dir = new File(new File(context.getFilesDir(), "sleep-audio-monitoring"), date);
-    File[] clips = dir.listFiles((file) -> file.isFile() && file.getName().endsWith(".wav"));
+    File[] clips = dir.listFiles((file) -> file.isFile() && file.getName().startsWith("event-") && file.getName().endsWith(".wav"));
     if (clips == null || clips.length == 0) {
       return events;
     }
@@ -369,6 +376,14 @@ public class SleepAudioMonitoringModule extends ReactContextBaseJavaModule {
       events.put(event);
     }
     return events;
+  }
+
+  private String previewClipFromDirectory(Context context, String date) {
+    File clip = new File(new File(new File(context.getFilesDir(), "sleep-audio-monitoring"), date), "preview.wav");
+    if (!clip.exists()) {
+      return null;
+    }
+    return android.net.Uri.fromFile(clip).toString();
   }
 
   private String isoForMillis(long millis) {
@@ -502,7 +517,11 @@ public class SleepAudioForegroundService extends Service {
   private static final int FRAME_SECONDS = 1;
   private static final int MAX_EVENT_GAP_FRAMES = 2;
   private static final int MIN_EVENT_MS = 800;
-  private static final int MAX_CLIP_SECONDS = 15;
+  private static final int MAX_CLIP_SECONDS = 30;
+  private static final int PREVIEW_CLIP_SECONDS = 60;
+  private static final int MIN_PLAYBACK_NORMALIZE_PEAK = 300;
+  private static final int TARGET_PLAYBACK_PEAK = 18000;
+  private static final double MAX_PLAYBACK_GAIN = 200.0;
   private static final long MAX_SESSION_MS = 10L * 60L * 60L * 1000L;
 
   private static volatile boolean running = false;
@@ -512,6 +531,7 @@ public class SleepAudioForegroundService extends Service {
   private String date;
   private String sessionId;
   private String startedAt;
+  private String localAudioUri;
   private final List<JSONObject> events = new ArrayList<>();
   private int eventIndex = 0;
 
@@ -564,6 +584,9 @@ public class SleepAudioForegroundService extends Service {
 
     running = true;
     startedAt = nowIso();
+    localAudioUri = null;
+    events.clear();
+    eventIndex = 0;
     writeCurrentDate();
     writeStatus(true, null);
 
@@ -662,10 +685,13 @@ public class SleepAudioForegroundService extends Service {
     private int eventFrames = 0;
     private long eventSoundDurationMs = 0;
     private final ByteArrayOutputStream clipBuffer = new ByteArrayOutputStream();
+    private final ByteArrayOutputStream previewBuffer = new ByteArrayOutputStream();
 
     void accept(short[] frame, int read) throws Exception {
       AudioFrameStats stats = statsForFrame(frame, read);
       long frameDurationMs = durationMsForSamples(read);
+      byte[] pcmBytes = pcmBytesForFrame(frame, read);
+      appendPreviewFrame(pcmBytes);
       updateBaseline(stats.averageDb);
       boolean hasSound = stats.averageDb > thresholdDb || stats.peakDb > thresholdDb + 8.0;
 
@@ -681,7 +707,7 @@ public class SleepAudioForegroundService extends Service {
           clipBuffer.reset();
         }
         silenceFrames = 0;
-        appendFrame(frame, read);
+        appendFrame(pcmBytes);
         eventPeakDb = Math.max(eventPeakDb, stats.peakDb);
         eventAverageDbTotal += stats.averageDb;
         eventZcrTotal += stats.zeroCrossingRate;
@@ -692,7 +718,7 @@ public class SleepAudioForegroundService extends Service {
 
       if (active) {
         silenceFrames += 1;
-        appendFrame(frame, read);
+        appendFrame(pcmBytes);
         if (silenceFrames >= MAX_EVENT_GAP_FRAMES) {
           finalizeEvent();
         }
@@ -702,6 +728,10 @@ public class SleepAudioForegroundService extends Service {
     void finish() throws Exception {
       if (active) {
         finalizeEvent();
+      }
+      if (events.isEmpty() && previewBuffer.size() > 0) {
+        File preview = writePreviewFile(previewBuffer.toByteArray());
+        localAudioUri = Uri.fromFile(preview).toString();
       }
     }
 
@@ -715,17 +745,30 @@ public class SleepAudioForegroundService extends Service {
       thresholdDb = Math.max(-48.0, baseline + 10.0);
     }
 
-    private void appendFrame(short[] frame, int read) {
+    private void appendPreviewFrame(byte[] pcmBytes) {
+      int maxBytes = SAMPLE_RATE * PREVIEW_CLIP_SECONDS * 2;
+      if (previewBuffer.size() + pcmBytes.length <= maxBytes) {
+        previewBuffer.write(pcmBytes, 0, pcmBytes.length);
+        return;
+      }
+
+      byte[] current = previewBuffer.toByteArray();
+      previewBuffer.reset();
+      int keepBytes = Math.max(0, maxBytes - pcmBytes.length);
+      if (keepBytes > 0 && current.length > 0) {
+        int start = Math.max(0, current.length - keepBytes);
+        previewBuffer.write(current, start, current.length - start);
+      }
+      previewBuffer.write(pcmBytes, 0, Math.min(pcmBytes.length, maxBytes));
+    }
+
+    private void appendFrame(byte[] pcmBytes) {
       int maxBytes = SAMPLE_RATE * MAX_CLIP_SECONDS * 2;
       if (clipBuffer.size() >= maxBytes) {
         return;
       }
-      ByteBuffer bytes = ByteBuffer.allocate(read * 2).order(ByteOrder.LITTLE_ENDIAN);
-      for (int index = 0; index < read; index += 1) {
-        bytes.putShort(frame[index]);
-      }
       int remaining = maxBytes - clipBuffer.size();
-      clipBuffer.write(bytes.array(), 0, Math.min(bytes.array().length, remaining));
+      clipBuffer.write(pcmBytes, 0, Math.min(pcmBytes.length, remaining));
     }
 
     private void finalizeEvent() throws Exception {
@@ -760,6 +803,14 @@ public class SleepAudioForegroundService extends Service {
 
   private long durationMsForSamples(int sampleCount) {
     return Math.max(1L, Math.round(sampleCount * 1000.0 / SAMPLE_RATE));
+  }
+
+  private byte[] pcmBytesForFrame(short[] frame, int read) {
+    ByteBuffer bytes = ByteBuffer.allocate(read * 2).order(ByteOrder.LITTLE_ENDIAN);
+    for (int index = 0; index < read; index += 1) {
+      bytes.putShort(frame[index]);
+    }
+    return bytes.array();
   }
 
   private AudioFrameStats statsForFrame(short[] frame, int read) {
@@ -818,9 +869,45 @@ public class SleepAudioForegroundService extends Service {
     }
     File clip = new File(dir, "event-" + eventIndex + ".wav");
     try (FileOutputStream output = new FileOutputStream(clip)) {
-      writeWav(output, pcmBytes);
+      writeWav(output, normalizePcmForPlayback(pcmBytes));
     }
     return clip;
+  }
+
+  private File writePreviewFile(byte[] pcmBytes) throws Exception {
+    File dir = new File(rootDir(), date);
+    if (!dir.exists()) {
+      dir.mkdirs();
+    }
+    File clip = new File(dir, "preview.wav");
+    try (FileOutputStream output = new FileOutputStream(clip)) {
+      writeWav(output, normalizePcmForPlayback(pcmBytes));
+    }
+    return clip;
+  }
+
+  private byte[] normalizePcmForPlayback(byte[] pcmBytes) {
+    int peak = 0;
+    for (int index = 0; index + 1 < pcmBytes.length; index += 2) {
+      int sample = ByteBuffer.wrap(pcmBytes, index, 2).order(ByteOrder.LITTLE_ENDIAN).getShort();
+      peak = Math.max(peak, Math.abs(sample));
+    }
+
+    if (peak < MIN_PLAYBACK_NORMALIZE_PEAK || peak >= TARGET_PLAYBACK_PEAK) {
+      return pcmBytes;
+    }
+
+    double gain = Math.min(MAX_PLAYBACK_GAIN, TARGET_PLAYBACK_PEAK / (double) peak);
+    byte[] amplified = new byte[pcmBytes.length];
+    for (int index = 0; index + 1 < pcmBytes.length; index += 2) {
+      int sample = ByteBuffer.wrap(pcmBytes, index, 2).order(ByteOrder.LITTLE_ENDIAN).getShort();
+      int boosted = (int) Math.round(sample * gain);
+      short clipped = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, boosted));
+      byte[] bytes = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN).putShort(clipped).array();
+      amplified[index] = bytes[0];
+      amplified[index + 1] = bytes[1];
+    }
+    return amplified;
   }
 
   private void writeWav(FileOutputStream output, byte[] pcmBytes) throws Exception {
@@ -869,6 +956,9 @@ public class SleepAudioForegroundService extends Service {
       }
       status.put("eventCount", events.size());
       status.put("events", new JSONArray(events));
+      if (localAudioUri != null) {
+        status.put("localAudioUri", localAudioUri);
+      }
       status.put("summary", summaryJson());
       if (lastError != null) {
         status.put("lastError", lastError);
